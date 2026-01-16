@@ -2,15 +2,14 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import telebot
 import sqlite3
-
+conn = sqlite3.connect("tasks.db", check_same_thread=False)
+cursor = conn.cursor()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не заданий")
 
 bot = telebot.TeleBot(BOT_TOKEN)
-conn = sqlite3.connect("tasks.db", check_same_thread=False)
-cursor = conn.cursor()
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS tasks (
@@ -22,15 +21,9 @@ CREATE TABLE IF NOT EXISTS tasks (
 """)
 conn.commit()
 
-tasks = {}  
-# формат:
-# {
-#   chat_id: ["задача 1", "задача 2"]
-# }
 user_states = {}
 
 def delete_task(chat_id, index):
-    chat_id = str(chat_id)
     cursor.execute(
         "SELECT id, text FROM tasks WHERE chat_id = ?",
         (str(chat_id),)
@@ -46,24 +39,23 @@ def delete_task(chat_id, index):
     conn.commit()
 
     return task_text
-    save_tasks(tasks)
-    user_states.pop(chat_id, None)
-    return deleted
 
 def show_tasks_with_numbers(chat_id):
-    chat_id = str(chat_id)
-    user_tasks = tasks.get(chat_id, [])
+    cursor.execute(
+        "SELECT text, category FROM tasks WHERE chat_id = ?",
+        (str(chat_id),)
+    )
+    rows = cursor.fetchall()
 
-    if not user_tasks:
-        bot.send_message(chat_id, "📭 У тебе ще немає задач")
+    if not rows:
+        bot.send_message(chat_id, "📭 У тебе немає задач")
         return
 
-    text = ""
-    for i, (text_task, category) in enumerate(user_tasks, start=1):
-            text += f"{i}. [{category}] {text_task}\n"
+    text = "🗑 Введи номер задачі:\n"
+    for i, (task_text, category) in enumerate(rows, start=1):
+        text += f"{i}. [{category}] {task_text}\n"
 
     bot.send_message(chat_id, text)
-
 
 STATE_WAITING_TASK = "waiting_task"
 STATE_WAITING_DELETE = "waiting_delete"
@@ -176,10 +168,15 @@ def handle_text(message):
         index = int(text) - 1
         chat_id_str = str(chat_id)
 
-        if index < 0 or index >= len(tasks.get(chat_id_str, [])):
+        cursor.execute(
+            "SELECT COUNT(*) FROM tasks WHERE chat_id = ?",
+            (chat_id_str,)
+        )
+        count = cursor.fetchone()[0]
+
+        if index < 0 or index >= count:
             bot.send_message(chat_id, "❌ Невірний номер")
             return
-
         deleted = delete_task(chat_id, index)
         bot.send_message(chat_id, f"🗑 Видалено: {deleted}")
         send_menu(chat_id)
