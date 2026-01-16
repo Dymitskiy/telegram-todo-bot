@@ -1,14 +1,13 @@
-import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
+import telebot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не заданий")
 
-
-bot = telebot.TeleBot
+bot = telebot.TeleBot(BOT_TOKEN)
 
 tasks = {}  
 # формат:
@@ -73,11 +72,7 @@ user_states = {}  # chat_id: state
 
 @bot.message_handler(commands=["start"])
 def start(message):
-    bot.send_message(
-        message.chat.id,
-        "Привіт! Я телеграм бот🤖DYMITSKIY чим можу допомогти? "
-    )
-    send_menu(message.chat.id)
+    bot.send_message(message.chat.id, "Я телеграм бот🤖DYMITSKIY ✅")
 
 @bot.callback_query_handler(func=lambda c: c.data == "add")
 def callback_add(c):
@@ -136,13 +131,7 @@ def handle_text(message):
 
 print("🤖 Бот запущено")
 
-bot.infinity_polling(
-    timeout=10,
-    long_polling_timeout=5
-)
-
-
-
+bot.infinity_polling()
 
 
 
