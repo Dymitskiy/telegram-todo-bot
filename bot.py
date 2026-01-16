@@ -1,6 +1,7 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import telebot
+import sqlite3
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -8,6 +9,18 @@ if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не заданий")
 
 bot = telebot.TeleBot(BOT_TOKEN)
+conn = sqlite3.connect("tasks.db", check_same_thread=False)
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id TEXT,
+    text TEXT,
+    category TEXT
+)
+""")
+conn.commit()
 
 tasks = {}  
 # формат:
@@ -18,24 +31,39 @@ user_states = {}
 
 def delete_task(chat_id, index):
     chat_id = str(chat_id)
-    deleted = tasks[chat_id].pop(index)
+    cursor.execute(
+        "SELECT id, text FROM tasks WHERE chat_id = ?",
+        (str(chat_id),)
+    )
+    rows = cursor.fetchall()
+
+    task_id, task_text = rows[index]
+
+    cursor.execute(
+        "DELETE FROM tasks WHERE id = ?",
+        (task_id,)
+    )
+    conn.commit()
+
+    return task_text
     save_tasks(tasks)
     user_states.pop(chat_id, None)
     return deleted
+
 def show_tasks_with_numbers(chat_id):
     chat_id = str(chat_id)
     user_tasks = tasks.get(chat_id, [])
 
     if not user_tasks:
-        bot.send_message(chat_id, "📭 У тебе немає задач")
-        send_menu(chat_id)
+        bot.send_message(chat_id, "📭 У тебе ще немає задач")
         return
 
-    text = "🗑 Введи номер задачі:\n"
-    for i, task in enumerate(user_tasks, start=1):
-        text += f"{i}. {task}\n"
+    text = ""
+    for i, (text_task, category) in enumerate(user_tasks, start=1):
+            text += f"{i}. [{category}] {text_task}\n"
 
     bot.send_message(chat_id, text)
+
 
 STATE_WAITING_TASK = "waiting_task"
 STATE_WAITING_DELETE = "waiting_delete"
@@ -50,23 +78,7 @@ def send_menu(chat_id):
         InlineKeyboardButton("📋 Список", callback_data="list")
     )
     bot.send_message(chat_id, "Обери дію:", reply_markup=keyboard)
-import json
-TASKS_FILE = "tasks.json"
-def load_tasks():
-    try:
-        if not os.path.exists(TASKS_FILE):
-            return {}
-        with open(TASKS_FILE, "r", encoding="utf-8") as file:
-            return json.load(file)
-    except Exception as e:
-        print("❌ Помилка читання tasks.json:", e)
-        return {}
 
-def save_tasks(tasks):
-    with open(TASKS_FILE, "w", encoding="utf-8") as file:
-        json.dump(tasks, file, ensure_ascii=False, indent=2)
-
-tasks = load_tasks()
 user_states = {}  # chat_id: state
 
 def send_category_menu(chat_id):
@@ -107,7 +119,12 @@ def callback_add(c):
 def callback_list(call):
     chat_id = str(call.message.chat.id)
 
-    user_tasks = tasks.get(chat_id, [])
+    cursor.execute(
+    "SELECT text, category FROM tasks WHERE chat_id = ?",
+    (chat_id,)
+    )
+    user_tasks = cursor.fetchall()
+
 
     if not user_tasks:
         bot.send_message(chat_id, "📭 У тебе ще немає задач")
@@ -137,8 +154,12 @@ def handle_text(message):
             "category": category
         }
 
-        tasks.setdefault(str(chat_id), []).append(task)
-        save_tasks(tasks)
+        cursor.execute(
+            "INSERT INTO tasks (chat_id, text, category) VALUES (?, ?, ?)",
+            (str(chat_id), task["text"], task["category"])
+        )
+        conn.commit()
+
         user_states.pop(chat_id, None)
 
         bot.send_message(
@@ -166,9 +187,6 @@ def handle_text(message):
         bot.send_message(chat_id, "🤔 Обери дію з меню")
         send_menu(chat_id)
 
-if not os.path.exists(TASKS_FILE):
-    with open(TASKS_FILE, "w", encoding="utf-8") as f:
-        f.write("{}")
 print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
