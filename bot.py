@@ -131,13 +131,13 @@ def handle_text(message):
         send_menu(chat_id)
 
 
-print("Бот запущено...")
+print("🤖 Бот запущено")
 
-while True:
-    try:
-        bot.infinity_polling(timeout=10, long_polling_timeout=5)
-    except Exception as e:
-        print("❌ Помилка polling:", e)
+bot.infinity_polling(
+    timeout=10,
+    long_polling_timeout=5
+)
+
 
 
 
