@@ -3,7 +3,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-print("BOT_TOKEN:", BOT_TOKEN)
+
 if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не заданий")
 
@@ -140,6 +140,7 @@ bot.infinity_polling(
     timeout=10,
     long_polling_timeout=5
 )
+
 
 
 
