@@ -2,7 +2,11 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 TOKEN = os.getenv("BOT_TOKEN")
+if not TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN не заданий")
+
 bot = telebot.TeleBot(TOKEN)
+
 tasks = {}  
 # формат:
 # {
@@ -128,6 +132,12 @@ def handle_text(message):
 
 
 print("Бот запущено...")
-bot.infinity_polling()
+
+while True:
+    try:
+        bot.infinity_polling(timeout=10, long_polling_timeout=5)
+    except Exception as e:
+        print("❌ Помилка polling:", e)
+
 
 
