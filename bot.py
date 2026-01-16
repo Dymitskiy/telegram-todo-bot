@@ -74,15 +74,39 @@ def save_tasks(tasks):
 tasks = load_tasks()
 user_states = {}  # chat_id: state
 
+def send_category_menu(chat_id):
+    keyboard = InlineKeyboardMarkup()
+    for cat in CATEGORIES:
+        keyboard.add(
+            InlineKeyboardButton(cat, callback_data=f"cat:{cat}")
+        )
+    bot.send_message(chat_id, "📂 Обери категорію:", reply_markup=keyboard)
+
+CATEGORIES = ["Робота", "Дім", "Терміново"]
+
+
 @bot.message_handler(commands=["start"])
 def start(message):
     bot.send_message(message.chat.id, "Я телеграм бот🤖DYMITSKIY ✅")
     send_menu(message.chat.id)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("cat:"))
+def callback_category(c):
+    chat_id = c.message.chat.id
+    category = c.data.split(":")[1]
+
+    user_states[chat_id] = {
+        "state": "waiting_task_text",
+        "category": category
+    }
+
+    bot.send_message(chat_id, f"✍️ Напиши задачу для категорії: {category}")
+
 @bot.callback_query_handler(func=lambda c: c.data == "add")
 def callback_add(c):
     chat_id = c.message.chat.id
-    set_state(chat_id, STATE_WAITING_TASK)
-    bot.send_message(chat_id, "✍️ Напиши текст задачі")
+    set_state(chat_id, "waiting_category")
+    send_category_menu(chat_id)
 
 @bot.callback_query_handler(func=lambda call: call.data == "list")
 def callback_list(call):
@@ -93,8 +117,10 @@ def callback_list(call):
     if not user_tasks:
         bot.send_message(chat_id, "📭 У тебе ще немає задач")
     else:
-        text = "\n".join(f"{i+1}. {task}" for i, task in enumerate(user_tasks))
-    bot.send_message(chat_id, text)
+        text = ""
+        for i, task in enumerate(user_tasks, start=1):
+            text += f"{i}. [{task['category']}] {task['text']}\n"
+        bot.send_message(chat_id, text)
 
 @bot.callback_query_handler(func=lambda call: call.data == "delete")
 def on_delete(call):
@@ -106,13 +132,33 @@ def handle_text(message):
     chat_id = message.chat.id
     text = message.text
 
-    if user_states.get(chat_id) == "waiting_task":
+    state_data = user_states.get(chat_id)
+
+    if isinstance(state_data, dict) and state_data.get("state") == "waiting_task_text":
+        category = state_data["category"]
+
+        task = {
+            "text": message.text,
+            "category": category
+        }
+
+        tasks.setdefault(str(chat_id), []).append(task)
+        save_tasks(tasks)
+        user_states.pop(chat_id, None)
+
+        bot.send_message(
+            chat_id,
+            f"✅ Задачу додано:\n{task['text']}\n📂 Категорія: {category}"
+        )
+        send_menu(chat_id)
+
         chat_id_str = str(chat_id)
         tasks.setdefault(chat_id_str, []).append(text)
         save_tasks(tasks)
         user_states.pop(chat_id, None)
         bot.send_message(chat_id, f"✅ Задачу додано:\n{text}")
         send_menu(chat_id)
+    
     elif user_states.get(chat_id) == STATE_WAITING_DELETE:
         if not text.isdigit():
             bot.send_message(chat_id, "❌ Введи номер задачі")
@@ -139,7 +185,6 @@ print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
-
 
 
 
