@@ -16,11 +16,6 @@ tasks = {}
 # }
 user_states = {}
 
-def add_task(chat_id, text):
-    chat_id = str(chat_id)
-    tasks.setdefault(chat_id, []).append(text)
-    save_tasks(tasks)
-    user_states.pop(chat_id, None)
 def delete_task(chat_id, index):
     chat_id = str(chat_id)
     deleted = tasks[chat_id].pop(index)
@@ -150,13 +145,6 @@ def handle_text(message):
             chat_id,
             f"✅ Задачу додано:\n{task['text']}\n📂 Категорія: {category}"
         )
-        send_menu(chat_id)
-
-        chat_id_str = str(chat_id)
-        tasks.setdefault(chat_id_str, []).append(text)
-        save_tasks(tasks)
-        user_states.pop(chat_id, None)
-        bot.send_message(chat_id, f"✅ Задачу додано:\n{text}")
         send_menu(chat_id)
     
     elif user_states.get(chat_id) == STATE_WAITING_DELETE:
