@@ -94,7 +94,7 @@ def callback_list(call):
         bot.send_message(chat_id, "📭 У тебе ще немає задач")
     else:
         text = "\n".join(f"{i+1}. {task}" for i, task in enumerate(user_tasks))
-        bot.send_message(chat_id, text)
+    bot.send_message(chat_id, text)
 
 @bot.callback_query_handler(func=lambda call: call.data == "delete")
 def on_delete(call):
@@ -139,6 +139,7 @@ print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
+
 
 
 
