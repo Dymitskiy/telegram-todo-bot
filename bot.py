@@ -3,6 +3,7 @@ import os
 import telebot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+print("DEBUG BOT_TOKEN =", os.getenv("BOT_TOKEN"))
 
 if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не заданий")
@@ -139,6 +140,7 @@ print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
+
 
 
 
