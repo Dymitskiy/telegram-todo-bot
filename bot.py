@@ -143,6 +143,3 @@ bot.infinity_polling()
 
 
 
-
-
-
