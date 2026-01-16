@@ -1,11 +1,14 @@
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
-TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не заданий")
 
-bot = telebot.TeleBot(TOKEN)
+
+bot = telebot.TeleBot
 
 tasks = {}  
 # формат:
