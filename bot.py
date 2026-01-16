@@ -58,11 +58,15 @@ def send_menu(chat_id):
 import json
 TASKS_FILE = "tasks.json"
 def load_tasks():
-    if not os.path.exists(TASKS_FILE):
+    try:
+        if not os.path.exists(TASKS_FILE):
+            return {}
+        with open(TASKS_FILE, "r", encoding="utf-8") as file:
+            return json.load(file)
+    except Exception as e:
+        print("❌ Помилка читання tasks.json:", e)
         return {}
 
-    with open(TASKS_FILE, "r", encoding="utf-8") as file:
-        return json.load(file)
 def save_tasks(tasks):
     with open(TASKS_FILE, "w", encoding="utf-8") as file:
         json.dump(tasks, file, ensure_ascii=False, indent=2)
@@ -128,9 +132,12 @@ def handle_text(message):
         bot.send_message(chat_id, "🤔 Обери дію з меню")
         send_menu(chat_id)
 
-
+if not os.path.exists(TASKS_FILE):
+    with open(TASKS_FILE, "w", encoding="utf-8") as f:
+        f.write("{}")
 print("🤖 Бот запущено")
-
+import sys
+sys.stdout.flush()
 bot.infinity_polling()
 
 
