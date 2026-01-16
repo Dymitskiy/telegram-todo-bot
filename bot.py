@@ -1,3 +1,4 @@
+print("BOT_TOKEN:", BOT_TOKEN)
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
@@ -140,6 +141,7 @@ bot.infinity_polling(
     timeout=10,
     long_polling_timeout=5
 )
+
 
 
 
