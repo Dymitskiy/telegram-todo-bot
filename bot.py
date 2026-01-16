@@ -77,7 +77,7 @@ user_states = {}  # chat_id: state
 @bot.message_handler(commands=["start"])
 def start(message):
     bot.send_message(message.chat.id, "Я телеграм бот🤖DYMITSKIY ✅")
-
+    send_menu(message.chat.id)
 @bot.callback_query_handler(func=lambda c: c.data == "add")
 def callback_add(c):
     chat_id = c.message.chat.id
@@ -139,6 +139,7 @@ print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
+
 
 
 
