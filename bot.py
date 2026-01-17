@@ -1,26 +1,26 @@
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import telebot
-
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from supabase import create_client
-print("SUPABASE_URL:", os.getenv("SUPABASE_URL"))
-print("SUPABASE_KEY exists:", bool(os.getenv("SUPABASE_KEY")))
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not BOT_TOKEN:
+    raise RuntimeError("❌ BOT_TOKEN не заданий")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("❌ Supabase credentials not set")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
+bot = telebot.TeleBot(BOT_TOKEN)
 def add_task_db(chat_id, text, category="general"):
     supabase.table("tasks").insert({
         "chat_id": str(chat_id),
         "text": text,
         "category": category
     }).execute()
-
 
 def get_tasks_db(chat_id):
     response = supabase.table("tasks") \
@@ -55,8 +55,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не заданий")
 
-bot = telebot.TeleBot(BOT_TOKEN)
-
 user_states = {}
 
 STATE_WAITING_DELETE = "waiting_delete"
@@ -83,7 +81,6 @@ def send_category_menu(chat_id):
     bot.send_message(chat_id, "📂 Обери категорію:", reply_markup=keyboard)
 
 CATEGORIES = ["Робота", "Дім", "Терміново"]
-
 
 @bot.message_handler(commands=["start"])
 def start(message):
@@ -173,13 +170,10 @@ def handle_text(message):
     bot.send_message(chat_id, "🤔 Обери дію з меню")
     send_menu(chat_id)
 
-
 print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
-
-
 
 
 
