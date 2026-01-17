@@ -6,6 +6,9 @@ from supabase import create_client
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+print("BOT_TOKEN:", "OK" if BOT_TOKEN else None)
+print("SUPABASE_URL:", SUPABASE_URL)
+print("SUPABASE_KEY:", "OK" if SUPABASE_KEY else None)
 
 if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не заданий")
@@ -174,6 +177,7 @@ print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
+
 
 
 
