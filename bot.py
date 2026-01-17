@@ -3,7 +3,8 @@ import os
 import telebot
 
 from supabase import create_client
-
+print("SUPABASE_URL:", os.getenv("SUPABASE_URL"))
+print("SUPABASE_KEY exists:", bool(os.getenv("SUPABASE_KEY")))
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
@@ -11,8 +12,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("❌ Supabase credentials not set")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-print("SUPABASE_URL:", os.getenv("SUPABASE_URL"))
-print("SUPABASE_KEY exists:", bool(os.getenv("SUPABASE_KEY")))
+
 
 def add_task_db(chat_id, text, category="general"):
     supabase.table("tasks").insert({
@@ -178,6 +178,7 @@ print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
+
 
 
 
