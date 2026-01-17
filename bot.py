@@ -1,9 +1,53 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import telebot
-import sqlite3
-conn = sqlite3.connect("tasks.db", check_same_thread=False)
-cursor = conn.cursor()
+
+from supabase import create_client
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError("❌ Supabase credentials not set")
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+def add_task_db(chat_id, text, category="general"):
+    supabase.table("tasks").insert({
+        "chat_id": str(chat_id),
+        "text": text,
+        "category": category
+    }).execute()
+
+
+def get_tasks_db(chat_id):
+    response = supabase.table("tasks") \
+        .select("*") \
+        .eq("chat_id", str(chat_id)) \
+        .order("id") \
+        .execute()
+    return response.data
+
+def show_tasks_with_numbers(chat_id):
+    tasks = get_tasks_db(chat_id)
+
+    if not tasks:
+        bot.send_message(chat_id, "📭 У тебе немає задач")
+        send_menu(chat_id)
+        return
+
+    text = "🗑 Введи номер задачі:\n"
+    for i, task in enumerate(tasks, start=1):
+        text += f"{i}. [{task['category']}] {task['text']}\n"
+
+    bot.send_message(chat_id, text)
+
+def delete_task_db(task_id):
+    supabase.table("tasks") \
+        .delete() \
+        .eq("id", task_id) \
+        .execute()
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
@@ -11,53 +55,8 @@ if not BOT_TOKEN:
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id TEXT,
-    text TEXT,
-    category TEXT
-)
-""")
-conn.commit()
-
 user_states = {}
 
-def delete_task(chat_id, index):
-    cursor.execute(
-        "SELECT id, text FROM tasks WHERE chat_id = ?",
-        (str(chat_id),)
-    )
-    rows = cursor.fetchall()
-
-    task_id, task_text = rows[index]
-
-    cursor.execute(
-        "DELETE FROM tasks WHERE id = ?",
-        (task_id,)
-    )
-    conn.commit()
-
-    return task_text
-
-def show_tasks_with_numbers(chat_id):
-    cursor.execute(
-        "SELECT text, category FROM tasks WHERE chat_id = ?",
-        (str(chat_id),)
-    )
-    rows = cursor.fetchall()
-
-    if not rows:
-        bot.send_message(chat_id, "📭 У тебе немає задач")
-        return
-
-    text = "🗑 Введи номер задачі:\n"
-    for i, (task_text, category) in enumerate(rows, start=1):
-        text += f"{i}. [{category}] {task_text}\n"
-
-    bot.send_message(chat_id, text)
-
-STATE_WAITING_TASK = "waiting_task"
 STATE_WAITING_DELETE = "waiting_delete"
 
 def set_state(chat_id, state):
@@ -103,28 +102,22 @@ def callback_category(c):
 
 @bot.callback_query_handler(func=lambda c: c.data == "add")
 def callback_add(c):
-    chat_id = c.message.chat.id
-    set_state(chat_id, "waiting_category")
-    send_category_menu(chat_id)
+    send_category_menu(c.message.chat.id)
 
 @bot.callback_query_handler(func=lambda call: call.data == "list")
 def callback_list(call):
-    chat_id = str(call.message.chat.id)
+    chat_id = call.message.chat.id
+    tasks = get_tasks_db(chat_id)
 
-    cursor.execute(
-    "SELECT text, category FROM tasks WHERE chat_id = ?",
-    (chat_id,)
-    )
-    user_tasks = cursor.fetchall()
-
-
-    if not user_tasks:
+    if not tasks:
         bot.send_message(chat_id, "📭 У тебе ще немає задач")
-    else:
-        text = ""
-        for i, task in enumerate(user_tasks, start=1):
-            text += f"{i}. [{task['category']}] {task['text']}\n"
-        bot.send_message(chat_id, text)
+        return
+
+    text = ""
+    for i, task in enumerate(tasks, start=1):
+        text += f"{i}. [{task['category']}] {task['text']}\n"
+
+    bot.send_message(chat_id, text)
 
 @bot.callback_query_handler(func=lambda call: call.data == "delete")
 def on_delete(call):
@@ -138,51 +131,46 @@ def handle_text(message):
 
     state_data = user_states.get(chat_id)
 
+    # ➕ Додавання задачі
     if isinstance(state_data, dict) and state_data.get("state") == "waiting_task_text":
         category = state_data["category"]
 
-        task = {
-            "text": message.text,
-            "category": category
-        }
-
-        cursor.execute(
-            "INSERT INTO tasks (chat_id, text, category) VALUES (?, ?, ?)",
-            (str(chat_id), task["text"], task["category"])
-        )
-        conn.commit()
+        add_task_db(chat_id, text, category)
 
         user_states.pop(chat_id, None)
 
         bot.send_message(
             chat_id,
-            f"✅ Задачу додано:\n{task['text']}\n📂 Категорія: {category}"
+            f"✅ Задачу додано:\n{text}\n📂 Категорія: {category}"
         )
         send_menu(chat_id)
-    
-    elif user_states.get(chat_id) == STATE_WAITING_DELETE:
+        return
+
+    # 🗑 Видалення задачі
+    if user_states.get(chat_id) == STATE_WAITING_DELETE:
         if not text.isdigit():
             bot.send_message(chat_id, "❌ Введи номер задачі")
             return
 
         index = int(text) - 1
-        chat_id_str = str(chat_id)
+        tasks = get_tasks_db(chat_id)
 
-        cursor.execute(
-            "SELECT COUNT(*) FROM tasks WHERE chat_id = ?",
-            (chat_id_str,)
-        )
-        count = cursor.fetchone()[0]
-
-        if index < 0 or index >= count:
+        if index < 0 or index >= len(tasks):
             bot.send_message(chat_id, "❌ Невірний номер")
             return
-        deleted = delete_task(chat_id, index)
-        bot.send_message(chat_id, f"🗑 Видалено: {deleted}")
+
+        task_id = tasks[index]["id"]
+        delete_task_db(task_id)
+
+        bot.send_message(chat_id, "🗑 Задачу видалено")
+        user_states.pop(chat_id, None)
         send_menu(chat_id)
-    else:
-        bot.send_message(chat_id, "🤔 Обери дію з меню")
-        send_menu(chat_id)
+        return
+
+    # ❓ Невідомий текст
+    bot.send_message(chat_id, "🤔 Обери дію з меню")
+    send_menu(chat_id)
+
 
 print("🤖 Бот запущено")
 import sys
