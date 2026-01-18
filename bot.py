@@ -2,7 +2,9 @@ import os
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from supabase import create_client
-
+from datetime import datetime, timedelta
+import time
+import threading
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -65,22 +67,53 @@ def show_tasks_with_numbers(chat_id):
 
     bot.send_message(chat_id, text)
 
+def reminder_worker():
+    while True:
+        now = datetime.utcnow().isoformat()
+
+        response = supabase.table("tasks") \
+            .select("*") \
+            .lte("remind_at", now) \
+            .neq("remind_at", None) \
+            .execute()
+
+        for task in response.data:
+            bot.send_message(
+                int(task["chat_id"]),
+                f"⏰ Нагадування:\n[{task['category']}] {task['text']}"
+            )
+
+            supabase.table("tasks").update({
+                "remind_at": None
+            }).eq("id", task["id"]).execute()
+
+        time.sleep(30)  # ← ОБОВʼЯЗКОВО ВСЕРЕДИНІ while
+ 
 user_states = {}
 
 STATE_WAITING_DELETE = "waiting_delete"
+STATE_WAITING_REMIND_TIME = "waiting_remind_time"
 
 def set_state(chat_id, state):
     user_states[chat_id] = state
 def send_menu(chat_id):
     keyboard = InlineKeyboardMarkup()
+
     keyboard.add(
         InlineKeyboardButton("🟡 Активні", callback_data="filter_active"),
         InlineKeyboardButton("✅ Виконані", callback_data="filter_done"),
-        InlineKeyboardButton("📋 Всі", callback_data="filter_all"),
-        InlineKeyboardButton("➕ Додати", callback_data="add"),
-        InlineKeyboardButton("🗑 Видалити", callback_data="delete"),   
     )
-    bot.send_message(chat_id, "Обери дію:", reply_markup=keyboard)
+
+    keyboard.add(
+        InlineKeyboardButton("📋 Всі", callback_data="filter_all"),
+    )
+
+    keyboard.add(
+        InlineKeyboardButton("➕ Додати", callback_data="add"),
+        InlineKeyboardButton("🗑 Видалити", callback_data="delete"),
+    )
+
+    bot.send_message(chat_id, "👇 Меню", reply_markup=keyboard)
 
 user_states = {}  # chat_id: state
 
@@ -119,9 +152,13 @@ def show_filtered_tasks(chat_id, status):
                 InlineKeyboardButton(
                     "✔ Виконано",
                     callback_data=f"done_{task['id']}"
+                ),
+                InlineKeyboardButton(
+                    "⏰ Нагадати",
+                    callback_data=f"remind_{task['id']}"
                 )
             )
-
+   
     bot.send_message(chat_id, text, reply_markup=keyboard)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("cat:"))
@@ -200,12 +237,41 @@ def filter_done(call):
 def filter_all(call):
     show_filtered_tasks(call.message.chat.id, None)
 
+@bot.callback_query_handler(func=lambda c: c.data.startswith("remind_"))
+def remind_callback(call):
+    task_id = int(call.data.split("_")[1])
+    user_states[call.message.chat.id] = {
+        "state": STATE_WAITING_REMIND_TIME,
+        "task_id": task_id
+    }
+    bot.send_message(call.message.chat.id, "⏰ Через скільки хвилин нагадати?")
+
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
     chat_id = message.chat.id
     text = message.text
 
     state_data = user_states.get(chat_id)
+    
+    if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_REMIND_TIME:
+        if not text.isdigit() or int(text) <= 0:
+            bot.send_message(chat_id, "❌ Введи число більше 0")
+            return
+
+        minutes = int(text)
+        remind_time = datetime.utcnow() + timedelta(minutes=minutes)
+
+        supabase.table("tasks").update({
+            "remind_at": remind_time.isoformat()
+        }).eq("id", state_data["task_id"]).execute()
+
+        user_states.pop(chat_id, None)
+        bot.send_message(
+            chat_id,
+            f"⏰ Готово!\nНагадаю через {minutes} хвилин 📅"
+        )
+        send_menu(chat_id)
+        return
 
     # ➕ Додавання задачі
     if isinstance(state_data, dict) and state_data.get("state") == "waiting_task_text":
@@ -223,7 +289,7 @@ def handle_text(message):
         return
 
     # 🗑 Видалення задачі
-    if user_states.get(chat_id) == STATE_WAITING_DELETE:
+    if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_DELETE:
         if not text.isdigit():
             bot.send_message(chat_id, "❌ Введи номер задачі")
             return
@@ -250,6 +316,7 @@ def handle_text(message):
 print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
+threading.Thread(target=reminder_worker, daemon=True).start()
 bot.infinity_polling()
 
 
