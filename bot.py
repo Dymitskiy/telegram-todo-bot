@@ -111,7 +111,7 @@ def callback_list(call):
         send_menu(chat_id)
         return
     chat_id = call.message.chat.id
-    tasks = get_tasks_db(chat_id)
+    tasks = get_tasks_db(call.message.chat.id)
     text = ""
     keyboard = InlineKeyboardMarkup()
 
