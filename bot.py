@@ -72,9 +72,10 @@ def reminder_worker():
         now = datetime.now(timezone.utc) .isoformat()
         response = supabase.table("tasks") \
             .select("*") \
-            .neq("remind_at", None) \
+            .not_.is_("remind_at", None) \
             .lte("remind_at", now) \
             .execute()
+
 
         for task in response.data:
             bot.send_message(
