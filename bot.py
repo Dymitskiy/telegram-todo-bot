@@ -38,6 +38,7 @@ def get_tasks_db(chat_id, only_active=True):
 
     if only_active:
         query = query.eq("status", "active")
+    print("TASKS FROM DB:", response.data)
 
     response = query.order("id").execute()
     return response.data
@@ -202,6 +203,7 @@ print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
+
 
 
 
