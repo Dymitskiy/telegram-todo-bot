@@ -2,7 +2,7 @@ import os
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from supabase import create_client
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 import threading
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -69,12 +69,11 @@ def show_tasks_with_numbers(chat_id):
 
 def reminder_worker():
     while True:
-        now = datetime.utcnow().isoformat()
-
+        now = datetime.now(timezone.utc) .isoformat()
         response = supabase.table("tasks") \
             .select("*") \
-            .lte("remind_at", now) \
             .neq("remind_at", None) \
+            .lte("remind_at", now) \
             .execute()
 
         for task in response.data:
@@ -259,8 +258,7 @@ def handle_text(message):
             return
 
         minutes = int(text)
-        remind_time = datetime.utcnow() + timedelta(minutes=minutes)
-
+        remind_time = datetime.now(timezone.utc) + timedelta(minutes=minutes)
         supabase.table("tasks").update({
             "remind_at": remind_time.isoformat()
         }).eq("id", state_data["task_id"]).execute()
