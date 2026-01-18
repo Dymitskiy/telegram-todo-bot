@@ -15,19 +15,31 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
-def add_task_db(chat_id, text, category="general"):
+
+def add_task_db(chat_id, text, category):
     supabase.table("tasks").insert({
         "chat_id": str(chat_id),
         "text": text,
-        "category": category
+        "category": category,
+        "status": "active"
     }).execute()
 
-def get_tasks_db(chat_id):
-    response = supabase.table("tasks") \
-        .select("*") \
+def delete_task_db(task_id, chat_id):
+    supabase.table("tasks") \
+        .delete() \
+        .eq("id", task_id) \
         .eq("chat_id", str(chat_id)) \
-        .order("id") \
         .execute()
+
+def get_tasks_db(chat_id, only_active=True):
+    query = supabase.table("tasks") \
+        .select("*") \
+        .eq("chat_id", str(chat_id))
+
+    if only_active:
+        query = query.eq("status", "active")
+
+    response = query.order("id").execute()
     return response.data
 
 def show_tasks_with_numbers(chat_id):
@@ -43,17 +55,6 @@ def show_tasks_with_numbers(chat_id):
         text += f"{i}. [{task['category']}] {task['text']}\n"
 
     bot.send_message(chat_id, text)
-
-def delete_task_db(task_id):
-    supabase.table("tasks") \
-        .delete() \
-        .eq("id", task_id) \
-        .execute()
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-if not BOT_TOKEN:
-    raise RuntimeError("❌ BOT_TOKEN не заданий")
 
 user_states = {}
 
@@ -84,7 +85,7 @@ CATEGORIES = ["Робота", "Дім", "Терміново"]
 
 @bot.message_handler(commands=["start"])
 def start(message):
-    bot.send_message(message.chat.id, "Я телеграм бот🤖DYMITSKIY ✅")
+    bot.send_message(message.chat.id, "Я телеграм бот🤖DYMYTSKIY ✅")
     send_menu(message.chat.id)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("cat:"))
@@ -105,23 +106,50 @@ def callback_add(c):
 
 @bot.callback_query_handler(func=lambda call: call.data == "list")
 def callback_list(call):
+    if not tasks:
+        bot.send_message(chat_id, "📭 Немає активних задач")
+        send_menu(chat_id)
+        return
     chat_id = call.message.chat.id
     tasks = get_tasks_db(chat_id)
-
-    if not tasks:
-        bot.send_message(chat_id, "📭 У тебе ще немає задач")
-        return
-
     text = ""
-    for i, task in enumerate(tasks, start=1):
-        text += f"{i}. [{task['category']}] {task['text']}\n"
+    keyboard = InlineKeyboardMarkup()
 
-    bot.send_message(chat_id, text)
+    for task in tasks:
+        status_icon = "✅" if task["status"] == "done" else "🟡"
+        text += f"{status_icon} [{task['category']}] {task['text']}\n"
+
+        if task["status"] == "active":
+            keyboard.add(
+                InlineKeyboardButton(
+                    text="✔ Виконано",
+                    callback_data=f"done_{task['id']}"
+                )
+            )
+
+    bot.send_message(
+        chat_id,
+        text or "📭 Немає активних задач",
+        reply_markup=keyboard
+    )
 
 @bot.callback_query_handler(func=lambda call: call.data == "delete")
 def on_delete(call):
     set_state(call.message.chat.id, STATE_WAITING_DELETE)
     show_tasks_with_numbers(call.message.chat.id)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("done_"))
+def mark_done(c):
+    task_id = c.data.split("_")[1]
+
+    supabase.table("tasks")\
+        .update({"status": "done"})\
+        .eq("id", task_id)\
+        .execute()
+
+    bot.answer_callback_query(c.id, "Задача виконана ✅")
+    bot.send_message(c.message.chat.id, "🎉 Задачу позначено як виконану")
+    callback_list(c)        
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
@@ -159,7 +187,7 @@ def handle_text(message):
             return
 
         task_id = tasks[index]["id"]
-        delete_task_db(task_id)
+        delete_task_db(task_id, chat_id)
 
         bot.send_message(chat_id, "🗑 Задачу видалено")
         user_states.pop(chat_id, None)
@@ -174,8 +202,6 @@ print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
-
-
 
 
 
