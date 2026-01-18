@@ -42,6 +42,15 @@ def get_tasks_db(chat_id, only_active=True):
     response = query.order("id").execute()
     return response.data
 
+def get_tasks_by_status(chat_id, status=None):
+    query = supabase.table("tasks").select("*").eq("chat_id", str(chat_id))
+
+    if status:
+        query = query.eq("status", status)
+
+    response = query.order("created_at").execute()
+    return response.data or []
+
 def show_tasks_with_numbers(chat_id):
     tasks = get_tasks_db(chat_id)
 
@@ -65,9 +74,11 @@ def set_state(chat_id, state):
 def send_menu(chat_id):
     keyboard = InlineKeyboardMarkup()
     keyboard.add(
+        InlineKeyboardButton("🟡 Активні", callback_data="filter_active"),
+        InlineKeyboardButton("✅ Виконані", callback_data="filter_done"),
+        InlineKeyboardButton("📋 Всі", callback_data="filter_all"),
         InlineKeyboardButton("➕ Додати", callback_data="add"),
-        InlineKeyboardButton("🗑 Видалити", callback_data="delete"),
-        InlineKeyboardButton("📋 Список", callback_data="list")
+        InlineKeyboardButton("🗑 Видалити", callback_data="delete"),   
     )
     bot.send_message(chat_id, "Обери дію:", reply_markup=keyboard)
 
@@ -87,6 +98,31 @@ CATEGORIES = ["Робота", "Дім", "Терміново"]
 def start(message):
     bot.send_message(message.chat.id, "Я телеграм бот🤖DYMYTSKIY ✅")
     send_menu(message.chat.id)
+
+def show_filtered_tasks(chat_id, status):
+    tasks = get_tasks_by_status(chat_id, status)
+
+    if not tasks:
+        bot.send_message(chat_id, "📭 Немає задач")
+        send_menu(chat_id)
+        return
+
+    text = ""
+    keyboard = InlineKeyboardMarkup()
+
+    for task in tasks:
+        icon = "✅" if task["status"] == "done" else "🟡"
+        text += f"{icon} [{task['category']}] {task['text']}\n"
+
+        if task["status"] == "active":
+            keyboard.add(
+                InlineKeyboardButton(
+                    "✔ Виконано",
+                    callback_data=f"done_{task['id']}"
+                )
+            )
+
+    bot.send_message(chat_id, text, reply_markup=keyboard)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("cat:"))
 def callback_category(c):
@@ -151,6 +187,18 @@ def mark_done(c):
     bot.answer_callback_query(c.id, "Задача виконана ✅")
     bot.send_message(c.message.chat.id, "🎉 Задачу позначено як виконану")
     callback_list(c)        
+
+@bot.callback_query_handler(func=lambda c: c.data == "filter_active")
+def filter_active(call):
+    show_filtered_tasks(call.message.chat.id, "active")
+
+@bot.callback_query_handler(func=lambda c: c.data == "filter_done")
+def filter_done(call):
+    show_filtered_tasks(call.message.chat.id, "done")
+
+@bot.callback_query_handler(func=lambda c: c.data == "filter_all")
+def filter_all(call):
+    show_filtered_tasks(call.message.chat.id, None)
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
