@@ -38,7 +38,6 @@ def get_tasks_db(chat_id, only_active=True):
 
     if only_active:
         query = query.eq("status", "active")
-    print("TASKS FROM DB:", response.data)
 
     response = query.order("id").execute()
     return response.data
@@ -107,12 +106,14 @@ def callback_add(c):
 
 @bot.callback_query_handler(func=lambda call: call.data == "list")
 def callback_list(call):
+    chat_id = call.message.chat.id
+    tasks = get_tasks_db(chat_id)
+
     if not tasks:
         bot.send_message(chat_id, "📭 Немає активних задач")
         send_menu(chat_id)
         return
-    chat_id = call.message.chat.id
-    tasks = get_tasks_db(call.message.chat.id)
+
     text = ""
     keyboard = InlineKeyboardMarkup()
 
@@ -128,11 +129,7 @@ def callback_list(call):
                 )
             )
 
-    bot.send_message(
-        chat_id,
-        text or "📭 Немає активних задач",
-        reply_markup=keyboard
-    )
+    bot.send_message(chat_id, text, reply_markup=keyboard)
 
 @bot.callback_query_handler(func=lambda call: call.data == "delete")
 def on_delete(call):
@@ -203,7 +200,6 @@ print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
 bot.infinity_polling()
-
 
 
 
