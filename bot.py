@@ -107,7 +107,8 @@ def callback_add(c):
 @bot.callback_query_handler(func=lambda call: call.data == "list")
 def callback_list(call):
     chat_id = call.message.chat.id
-    tasks = get_tasks_db(chat_id)
+
+    tasks = get_tasks_db(chat_id)  # ← СПОЧАТКУ отримуємо задачі
 
     if not tasks:
         bot.send_message(chat_id, "📭 Немає активних задач")
@@ -118,10 +119,12 @@ def callback_list(call):
     keyboard = InlineKeyboardMarkup()
 
     for task in tasks:
-        status_icon = "✅" if task["status"] == "done" else "🟡"
+        status = task["status"] or "active"
+        status_icon = "✅" if status == "done" else "🟡"
+
         text += f"{status_icon} [{task['category']}] {task['text']}\n"
 
-        if task["status"] == "active":
+        if status == "active":
             keyboard.add(
                 InlineKeyboardButton(
                     text="✔ Виконано",
