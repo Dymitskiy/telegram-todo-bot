@@ -5,6 +5,22 @@ from supabase import create_client
 from datetime import datetime, timedelta, timezone
 import time
 import threading
+
+TEXTS = {
+    "start": {
+        "ua": "Я телеграм бот 🤖 DYMYTSKIY ✅",
+        "en": "I am a Telegram bot 🤖 DYMYTSKIY ✅"
+    },
+    "menu": {
+        "ua": "Обери дію:",
+        "en": "Choose an action:"
+    },
+    "choose_language": {
+        "ua": "🌍 Обери мову",
+        "en": "🌍 Choose language"
+    }
+}
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -17,6 +33,19 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
+
+def t(chat_id, key):
+    user = get_or_create_user(chat_id)
+    lang = user.get("language", "ua")
+    return TEXTS[key][lang]
+
+def language_keyboard():
+    kb = InlineKeyboardMarkup()
+    kb.add(
+        InlineKeyboardButton("🇺🇦 Українська", callback_data="lang_ua"),
+        InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")
+    )
+    return kb
 
 def add_task_db(chat_id, text, category):
     supabase.table("tasks").insert({
@@ -43,6 +72,30 @@ def get_tasks_db(chat_id, only_active=True):
 
     response = query.order("id").execute()
     return response.data
+
+def get_or_create_user(chat_id):
+    response = supabase.table("users") \
+        .select("*") \
+        .eq("chat_id", chat_id) \
+        .execute()
+
+    if response.data:
+        return response.data[0]
+
+    user = {
+        "chat_id": chat_id,
+        "language": "ua",
+        "plan": "free"
+    }
+
+    supabase.table("users").insert(user).execute()
+    return user
+
+def set_user_language(chat_id, language):
+    supabase.table("users") \
+        .update({"language": language}) \
+        .eq("chat_id", chat_id) \
+        .execute()
 
 def get_tasks_count(chat_id):
     response = supabase.table("tasks") \
@@ -173,8 +226,29 @@ CATEGORIES = ["Робота", "Дім", "Терміново"]
 
 @bot.message_handler(commands=["start"])
 def start(message):
-    bot.send_message(message.chat.id, "Я телеграм бот🤖DYMYTSKIY ✅")
-    send_menu(message.chat.id)
+    chat_id = message.chat.id
+
+    # 1️⃣ створюємо або знаходимо користувача
+    user = get_or_create_user(chat_id)
+
+    # 2️⃣ визначаємо мову (якщо ще не вибрана — ua)
+    lang = user.get("language") or "ua"
+
+    # 3️⃣ локалізоване привітання
+    bot.send_message(
+        chat_id,
+        TEXTS["welcome"][lang]
+    )
+
+    # 4️⃣ якщо мова ще не вибрана — показуємо вибір
+    if not user.get("language"):
+        bot.send_message(
+            chat_id,
+            TEXTS["choose_language"]["ua"],
+            reply_markup=language_keyboard()
+        )
+    else:
+        send_menu(chat_id)
 
 def show_filtered_tasks(chat_id, status):
     tasks = get_tasks_by_status(chat_id, status)
@@ -204,6 +278,13 @@ def show_filtered_tasks(chat_id, status):
             )
    
     bot.send_message(chat_id, text, reply_markup=keyboard)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("lang_"))
+def set_language(c):
+    lang = c.data.split("_")[1]
+    set_user_language(c.message.chat.id, lang)
+    bot.send_message(c.message.chat.id, t(c.message.chat.id, "start"))
+    send_menu(c.message.chat.id)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("cat:"))
 def callback_category(c):
