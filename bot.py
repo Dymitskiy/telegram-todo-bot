@@ -8,7 +8,7 @@ import threading
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
+FREE_LIMIT = 20
 if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не заданий")
 
@@ -43,6 +43,31 @@ def get_tasks_db(chat_id, only_active=True):
 
     response = query.order("id").execute()
     return response.data
+
+def get_tasks_count(chat_id):
+    response = supabase.table("tasks") \
+        .select("id", count="exact") \
+        .eq("chat_id", str(chat_id)) \
+        .execute()
+
+    return response.count or 0
+
+def get_user_plan(chat_id):
+    response = supabase.table("users") \
+        .select("plan") \
+        .eq("chat_id", str(chat_id)) \
+        .execute()
+
+    if response.data:
+        return response.data[0]["plan"]
+
+    # якщо користувача ще немає — створюємо
+    supabase.table("users").insert({
+        "chat_id": str(chat_id),
+        "plan": "free"
+    }).execute()
+
+    return "free"
 
 def get_tasks_by_status(chat_id, status=None):
     query = supabase.table("tasks").select("*").eq("chat_id", str(chat_id))
@@ -119,7 +144,9 @@ def send_menu(chat_id):
         InlineKeyboardButton("➕ Додати", callback_data="add"),
         InlineKeyboardButton("🗑 Видалити", callback_data="delete"),
     )
-
+    keyboard.add(
+    InlineKeyboardButton("💎 Premium", callback_data="premium")
+    )
     bot.send_message(chat_id, "👇 Меню", reply_markup=keyboard)
 def back_button():
     return InlineKeyboardButton("↩ Назад", callback_data="back")
@@ -282,12 +309,33 @@ def callback_back(call):
     user_states.pop(call.message.chat.id, None)
     send_menu(call.message.chat.id)
 
+@bot.callback_query_handler(func=lambda c: c.data == "premium")
+def premium_info(c):
+    bot.send_message(
+        c.message.chat.id,
+        "💎 Premium доступ:\n\n"
+        "✅ Безліміт задач\n"
+        "⏰ Безліміт нагадувань\n"
+        "📂 Розширені фільтри\n"
+        "🚀 Майбутні фічі\n\n"
+        "Напиши:\n👉 ХОЧУ PREMIUM"
+    )
+
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
     chat_id = message.chat.id
     text = message.text
-
+    if text.lower() == "хочу premium":
+        bot.send_message(
+            chat_id,
+            "🔥 Чудово!\n\n"
+            "Premium буде доступний найближчим часом.\n"
+            "Я повідомлю тебе першим 👌"
+        )
+        return
+    
     state_data = user_states.get(chat_id)
+    
     
     if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_REMIND_TIME:
         if not text.isdigit() or int(text) <= 0:
@@ -307,12 +355,25 @@ def handle_text(message):
         )
         send_menu(chat_id)
         return
-
+    
     # ➕ Додавання задачі
     if isinstance(state_data, dict) and state_data.get("state") == "waiting_task_text":
         category = state_data["category"]
 
+        plan = get_user_plan(chat_id)
+
+        if plan == "free":
+            count = get_tasks_count(chat_id)
+            if count >= FREE_LIMIT:
+                bot.send_message(
+                    chat_id,
+                    "🔒 Ліміт безкоштовного плану (20 задач).\n\n💎 Оформи Premium"
+                )
+                send_menu(chat_id)
+                return
+
         add_task_db(chat_id, text, category)
+
 
         user_states.pop(chat_id, None)
 
