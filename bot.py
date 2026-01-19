@@ -65,7 +65,14 @@ def show_tasks_with_numbers(chat_id):
     for i, task in enumerate(tasks, start=1):
         text += f"{i}. [{task['category']}] {task['text']}\n"
 
-    bot.send_message(chat_id, text)
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(back_button())
+
+    bot.send_message(
+        chat_id,
+        text,
+        reply_markup=keyboard
+    )
 
 def reminder_worker():
     while True:
@@ -114,16 +121,26 @@ def send_menu(chat_id):
     )
 
     bot.send_message(chat_id, "👇 Меню", reply_markup=keyboard)
+def back_button():
+    return InlineKeyboardButton("↩ Назад", callback_data="back")
 
 user_states = {}  # chat_id: state
 
 def send_category_menu(chat_id):
     keyboard = InlineKeyboardMarkup()
+
     for cat in CATEGORIES:
         keyboard.add(
             InlineKeyboardButton(cat, callback_data=f"cat:{cat}")
         )
-    bot.send_message(chat_id, "📂 Обери категорію:", reply_markup=keyboard)
+
+    keyboard.add(back_button())  # ← ДОДАЛИ
+
+    bot.send_message(
+        chat_id,
+        "📂 Обери категорію:",
+        reply_markup=keyboard
+    )
 
 CATEGORIES = ["Робота", "Дім", "Терміново"]
 
@@ -171,7 +188,14 @@ def callback_category(c):
         "category": category
     }
 
-    bot.send_message(chat_id, f"✍️ Напиши задачу для категорії: {category}")
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(back_button())
+
+    bot.send_message(
+        chat_id,
+        f"✍️ Напиши задачу для категорії: {category}",
+        reply_markup=keyboard
+    )
 
 @bot.callback_query_handler(func=lambda c: c.data == "add")
 def callback_add(c):
@@ -244,7 +268,19 @@ def remind_callback(call):
         "state": STATE_WAITING_REMIND_TIME,
         "task_id": task_id
     }
-    bot.send_message(call.message.chat.id, "⏰ Через скільки хвилин нагадати?")
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(back_button())
+
+    bot.send_message(
+        call.message.chat.id,
+        "⏰ Через скільки хвилин нагадати?",
+        reply_markup=keyboard
+    )
+
+@bot.callback_query_handler(func=lambda call: call.data == "back")
+def callback_back(call):
+    user_states.pop(call.message.chat.id, None)
+    send_menu(call.message.chat.id)
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
