@@ -12,11 +12,11 @@ TEXTS = {
         "en": "I am a Telegram bot 🤖 DYMYTSKIY ✅"
     },
     "menu": {
-        "ua": "Обери дію:",
+        "uk": "Обери дію:",
         "en": "Choose an action:"
     },
     "choose_language": {
-        "ua": "🌍 Обери мову",
+        "uk": "🌍 Обери мову",
         "en": "🌍 Choose language"
     }
 }
@@ -36,13 +36,13 @@ bot = telebot.TeleBot(BOT_TOKEN)
 
 def t(chat_id, key):
     user = get_or_create_user(chat_id)
-    lang = user.get("language", "ua")
+    lang = user.get("language", "uk")
     return TEXTS[key][lang]
 
 def language_keyboard():
     kb = InlineKeyboardMarkup()
     kb.add(
-        InlineKeyboardButton("🇺🇦 Українська", callback_data="lang_ua"),
+        InlineKeyboardButton("🇺🇦 Українська", callback_data="lang_uk"),
         InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")
     )
     return kb
@@ -84,7 +84,7 @@ def get_or_create_user(chat_id):
 
     user = {
         "chat_id": chat_id,
-        "language": "ua",
+        "language": "uk",
         "plan": "free"
     }
 
@@ -231,8 +231,8 @@ def start(message):
     # 1️⃣ створюємо або знаходимо користувача
     user = get_or_create_user(chat_id)
 
-    # 2️⃣ визначаємо мову (якщо ще не вибрана — ua)
-    lang = user.get("language") or "ua"
+    # 2️⃣ визначаємо мову (якщо ще не вибрана — uk)
+    lang = user.get("language") or "uk"
 
     # 3️⃣ локалізоване привітання
     bot.send_message(
@@ -244,7 +244,7 @@ def start(message):
     if not user.get("language"):
         bot.send_message(
             chat_id,
-            TEXTS["choose_language"]["ua"],
+            TEXTS["choose_language"]["uk"],
             reply_markup=language_keyboard()
         )
     else:
