@@ -7,8 +7,8 @@ import time
 import threading
 
 TEXTS = {
-    "start": {
-        "ua": "Я телеграм бот 🤖 DYMYTSKIY ✅",
+    "welcome": {
+        "uk": "Я телеграм бот 🤖 DYMYTSKIY ✅",
         "en": "I am a Telegram bot 🤖 DYMYTSKIY ✅"
     },
     "menu": {
