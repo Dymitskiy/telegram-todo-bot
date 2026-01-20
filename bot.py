@@ -24,6 +24,15 @@ TEXTS = {
         "en": "🌍 Language changed"
     }
 }
+TEXTS["menu_buttons"] = {
+    "active": {"uk": "🟡 Активні", "en": "🟡 Active"},
+    "done": {"uk": "✅ Виконані", "en": "✅ Done"},
+    "all": {"uk": "📋 Всі", "en": "📋 All"},
+    "add": {"uk": "➕ Додати", "en": "➕ Add"},
+    "delete": {"uk": "🗑 Видалити", "en": "🗑 Delete"},
+    "premium": {"uk": "💎 Premium", "en": "💎 Premium"},
+    "language": {"uk": "🌍 Змінити мову", "en": "🌍 Change language"},
+}
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -195,26 +204,31 @@ STATE_WAITING_REMIND_TIME = "waiting_remind_time"
 def set_state(chat_id, state):
     user_states[chat_id] = state
 def send_menu(chat_id):
+    lang = get_or_create_user(chat_id)["language"] or "uk"
+    tbtn = TEXTS["menu_buttons"]
+
     keyboard = InlineKeyboardMarkup()
 
     keyboard.add(
-        InlineKeyboardButton("🟡 Активні", callback_data="filter_active"),
-        InlineKeyboardButton("✅ Виконані", callback_data="filter_done"),
+        InlineKeyboardButton(tbtn["active"][lang], callback_data="filter_active"),
+        InlineKeyboardButton(tbtn["done"][lang], callback_data="filter_done"),
     )
 
     keyboard.add(
-        InlineKeyboardButton("📋 Всі", callback_data="filter_all"),
+        InlineKeyboardButton(tbtn["all"][lang], callback_data="filter_all"),
     )
 
     keyboard.add(
-        InlineKeyboardButton("➕ Додати", callback_data="add"),
-        InlineKeyboardButton("🗑 Видалити", callback_data="delete"),
+        InlineKeyboardButton(tbtn["add"][lang], callback_data="add"),
+        InlineKeyboardButton(tbtn["delete"][lang], callback_data="delete"),
     )
+
     keyboard.add(
-    InlineKeyboardButton("💎 Premium", callback_data="premium")
+        InlineKeyboardButton(tbtn["premium"][lang], callback_data="premium")
     )
+
     keyboard.add(
-        InlineKeyboardButton("🌍 Змінити мову", callback_data="change_language")
+        InlineKeyboardButton(tbtn["language"][lang], callback_data="change_language")
     )
     TEXTS["menu_title"] = {
         "uk": "👇 Меню",
