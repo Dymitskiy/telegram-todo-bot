@@ -18,6 +18,10 @@ TEXTS = {
     "choose_language": {
         "uk": "🌍 Обери мову",
         "en": "🌍 Choose language"
+    },
+    "language_changed": {
+        "uK": "🌍 Мову змінено",
+        "en": "🌍 Language changed"
     }
 }
 
@@ -294,21 +298,6 @@ def show_filtered_tasks(chat_id, status):
    
     bot.send_message(chat_id, text, reply_markup=keyboard)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("lang_"))
-def set_language(call):
-    chat_id = call.message.chat.id
-    lang = call.data.split("_")[1]  # uk / en
-
-    # 🔹 оновлюємо мову в БД
-    supabase.table("users").update({
-        "language": lang
-    }).eq("chat_id", chat_id).execute()
-
-    # 🔹 показуємо welcome вже новою мовою
-    bot.send_message(chat_id, TEXTS["welcome"][lang])
-
-    send_menu(chat_id)
-
 @bot.callback_query_handler(func=lambda c: c.data == "change_language")
 def change_language(c):
     chat_id = c.message.chat.id
@@ -318,6 +307,27 @@ def change_language(c):
         t(chat_id, "choose_language"),
         reply_markup=language_keyboard()
     )
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("lang_"))
+def set_language(c):
+    chat_id = c.message.chat.id
+    lang = c.data.split("_")[1]  # uk або en
+
+    # 1️⃣ зберігаємо мову в Supabase
+    supabase.table("users").update({
+        "language": lang
+    }).eq("chat_id", chat_id).execute()
+
+    # 2️⃣ ПОВТОРНО читаємо користувача з БД (КЛЮЧОВО!)
+    user = get_user(chat_id)
+    lang = user["language"]
+
+    # 3️⃣ повідомлення + меню ВЖЕ НОВОЮ МОВОЮ
+    bot.send_message(
+        chat_id,
+        TEXTS["language_changed"][lang]
+    )
+    send_menu(chat_id)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("cat:"))
 def callback_category(c):
@@ -528,7 +538,6 @@ import sys
 sys.stdout.flush()
 threading.Thread(target=reminder_worker, daemon=True).start()
 bot.infinity_polling()
-
 
 
 
