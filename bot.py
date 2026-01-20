@@ -316,6 +316,16 @@ def set_language(call):
 
     send_menu(chat_id)
 
+@bot.callback_query_handler(func=lambda c: c.data == "change_language")
+def change_language(c):
+    chat_id = c.message.chat.id
+
+    bot.send_message(
+        chat_id,
+        t(chat_id, "choose_language"),
+        reply_markup=language_keyboard()
+    )
+
 @bot.callback_query_handler(func=lambda c: c.data.startswith("cat:"))
 def callback_category(c):
     chat_id = c.message.chat.id
