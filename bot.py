@@ -16,8 +16,8 @@ TEXTS = {
         "en": "Choose an action:"
     },
     "choose_language": {
-        "uk": "🌍",
-        "en": "🌍"
+        "uk": "🌍 Обери мову",
+        "en": "🌍 Choose language"
     },
     "language_changed": {
         "uk": "🌍 Мову змінено",
@@ -31,7 +31,15 @@ TEXTS["menu_buttons"] = {
     "add": {"uk": "➕ Додати", "en": "➕ Add"},
     "delete": {"uk": "🗑 Видалити", "en": "🗑 Delete"},
     "premium": {"uk": "💎 Premium", "en": "💎 Premium"},
-    "language": {"uk": "🌍 Змінити мову", "en": "🌍 Change language"},
+    "language": {"uk": "🌍", "en": "🌍"},
+}
+TEXTS["menu_title"] = {
+    "uk": "👇 Меню",
+    "en": "👇 Menu"
+}
+TEXTS["no_tasks"] = {
+    "uk": "📭 У тебе немає задач",
+    "en": "📭 No tasks yet"
 }
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -47,9 +55,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 bot = telebot.TeleBot(BOT_TOKEN)
 
-def t(chat_id, key):
-    user = get_or_create_user(chat_id)
-    lang = user.get("language", "uk")
+def t(lang, key):
     return TEXTS[key][lang]
 
 def language_keyboard():
@@ -105,7 +111,6 @@ def get_or_create_user(chat_id):
 
     supabase.table("users").insert(user).execute()
     return user
-
 
 def send_language_menu(chat_id):
     keyboard = InlineKeyboardMarkup()
@@ -174,37 +179,40 @@ def show_tasks_with_numbers(chat_id):
         reply_markup=keyboard
     )
 
+def get_lang(chat_id):
+    return (get_or_create_user(chat_id).get("language") or "uk")
+
 def reminder_worker():
     while True:
-        now = datetime.now(timezone.utc) .isoformat()
-        response = supabase.table("tasks") \
-            .select("*") \
-            .not_.is_("remind_at", None) \
-            .lte("remind_at", now) \
-            .execute()
+        try:
+            now = datetime.now(timezone.utc) .isoformat()
+            response = supabase.table("tasks") \
+                .select("*") \
+                .not_.is_("remind_at", None) \
+                .lte("remind_at", now) \
+                .execute()
 
 
-        for task in response.data:
-            bot.send_message(
-                int(task["chat_id"]),
-                f"⏰ Нагадування:\n[{task['category']}] {task['text']}"
-            )
+            for task in response.data:
+                bot.send_message(
+                    int(task["chat_id"]),
+                    f"⏰ Нагадування:\n[{task['category']}] {task['text']}"
+                )
 
-            supabase.table("tasks").update({
-                "remind_at": None
-            }).eq("id", task["id"]).execute()
-
+                supabase.table("tasks").update({
+                    "remind_at": None
+                }).eq("id", task["id"]).execute()
+        except Exception as e:
+            print("REMINDER ERROR:", e)
         time.sleep(30)  # ← ОБОВʼЯЗКОВО ВСЕРЕДИНІ while
  
-user_states = {}
-
 STATE_WAITING_DELETE = "waiting_delete"
 STATE_WAITING_REMIND_TIME = "waiting_remind_time"
 
 def set_state(chat_id, state):
     user_states[chat_id] = state
 def send_menu(chat_id):
-    lang = get_or_create_user(chat_id)["language"] or "uk"
+    lang = get_lang(chat_id)
     tbtn = TEXTS["menu_buttons"]
 
     keyboard = InlineKeyboardMarkup()
@@ -230,10 +238,6 @@ def send_menu(chat_id):
     keyboard.add(
         InlineKeyboardButton(tbtn["language"][lang], callback_data="change_language")
     )
-    TEXTS["menu_title"] = {
-        "uk": "👇 Меню",
-        "en": "👇 Menu"
-    }
     bot.send_message(chat_id, t(chat_id, "menu_title"), reply_markup=keyboard)
 def back_button():
     return InlineKeyboardButton("↩ Назад", callback_data="back")
@@ -243,7 +247,7 @@ user_states = {}  # chat_id: state
 def send_category_menu(chat_id):
     keyboard = InlineKeyboardMarkup()
 
-    for cat in CATEGORIES:
+    for cat in CATEGORIES[get_lang(chat_id)]:
         keyboard.add(
             InlineKeyboardButton(cat, callback_data=f"cat:{cat}")
         )
@@ -256,7 +260,10 @@ def send_category_menu(chat_id):
         reply_markup=keyboard
     )
 
-CATEGORIES = ["Робота", "Дім", "Терміново"]
+CATEGORIES = {
+    "uk": ["Робота", "Дім", "Терміново"],
+    "en": ["Work", "Home", "Urgent"]
+}
 
 @bot.message_handler(commands=["start"])
 def start(message):
@@ -528,6 +535,7 @@ def handle_text(message):
     # 🗑 Видалення задачі
     if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_DELETE:
         if not text.isdigit():
+            user_states.pop(chat_id, None)
             bot.send_message(chat_id, "❌ Введи номер задачі")
             return
 
@@ -555,7 +563,6 @@ import sys
 sys.stdout.flush()
 threading.Thread(target=reminder_worker, daemon=True).start()
 bot.infinity_polling()
-
 
 
 
