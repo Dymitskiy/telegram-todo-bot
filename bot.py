@@ -97,6 +97,18 @@ def set_user_language(chat_id, language):
         .eq("chat_id", chat_id) \
         .execute()
 
+def send_language_menu(chat_id):
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(
+        InlineKeyboardButton("🇺🇦 Українська", callback_data="lang_uk"),
+        InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")
+    )
+    bot.send_message(
+        chat_id,
+        "🌍 Обери мову / Choose language",
+        reply_markup=keyboard
+    )
+
 def get_tasks_count(chat_id):
     response = supabase.table("tasks") \
         .select("id", count="exact") \
@@ -200,6 +212,9 @@ def send_menu(chat_id):
     keyboard.add(
     InlineKeyboardButton("💎 Premium", callback_data="premium")
     )
+    keyboard.add(
+        InlineKeyboardButton("🌍 Змінити мову", callback_data="change_language")
+    )
     bot.send_message(chat_id, "👇 Меню", reply_markup=keyboard)
 def back_button():
     return InlineKeyboardButton("↩ Назад", callback_data="back")
@@ -285,6 +300,21 @@ def set_language(c):
     set_user_language(c.message.chat.id, lang)
     bot.send_message(c.message.chat.id, t(c.message.chat.id, "start"))
     send_menu(c.message.chat.id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("lang_"))
+def set_language(call):
+    chat_id = call.message.chat.id
+    lang = call.data.split("_")[1]  # uk / en
+
+    # 🔹 оновлюємо мову в БД
+    supabase.table("users").update({
+        "language": lang
+    }).eq("chat_id", chat_id).execute()
+
+    # 🔹 показуємо welcome вже новою мовою
+    bot.send_message(chat_id, TEXTS["welcome"][lang])
+
+    send_menu(chat_id)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("cat:"))
 def callback_category(c):
