@@ -20,7 +20,7 @@ TEXTS = {
         "en": "🌍 Choose language"
     },
     "language_changed": {
-        "uK": "🌍 Мову змінено",
+        "uk": "🌍 Мову змінено",
         "en": "🌍 Language changed"
     }
 }
@@ -88,18 +88,12 @@ def get_or_create_user(chat_id):
 
     user = {
         "chat_id": chat_id,
-        "language": "uk",
+        "language": None,
         "plan": "free"
     }
 
     supabase.table("users").insert(user).execute()
     return user
-
-def set_user_language(chat_id, language):
-    supabase.table("users") \
-        .update({"language": language}) \
-        .eq("chat_id", chat_id) \
-        .execute()
 
 def send_language_menu(chat_id):
     keyboard = InlineKeyboardMarkup()
@@ -219,7 +213,11 @@ def send_menu(chat_id):
     keyboard.add(
         InlineKeyboardButton("🌍 Змінити мову", callback_data="change_language")
     )
-    bot.send_message(chat_id, "👇 Меню", reply_markup=keyboard)
+    TEXTS["menu_title"] = {
+        "uk": "👇 Меню",
+        "en": "👇 Menu"
+    }
+    bot.send_message(chat_id, t(chat_id, "menu_title"), reply_markup=keyboard)
 def back_button():
     return InlineKeyboardButton("↩ Назад", callback_data="back")
 
@@ -319,8 +317,9 @@ def set_language(c):
     }).eq("chat_id", chat_id).execute()
 
     # 2️⃣ ПОВТОРНО читаємо користувача з БД (КЛЮЧОВО!)
-    user = get_user(chat_id)
+    user = get_or_create_user(chat_id)
     lang = user["language"]
+
 
     # 3️⃣ повідомлення + меню ВЖЕ НОВОЮ МОВОЮ
     bot.send_message(
