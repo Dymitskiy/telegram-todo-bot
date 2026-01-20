@@ -23,7 +23,79 @@ TEXTS = {
         "uk": "🌍 Мову змінено",
         "en": "🌍 Language changed"
     }
-}
+    }
+TEXTS.update({
+    "choose_category": {
+        "uk": "📂 Обери категорію:",
+        "en": "📂 Choose a category:"
+    },
+    "enter_task": {
+        "uk": "✍️ Напиши задачу для категорії:",
+        "en": "✍️ Enter task for category:"
+    },
+    "enter_delete_number": {
+        "uk": "🗑 Введи номер задачі:",
+        "en": "🗑 Enter task number:"
+    },
+    "task_added": {
+        "uk": "✅ Задачу додано:",
+        "en": "✅ Task added:"
+    },
+    "task_deleted": {
+        "uk": "🗑 Задачу видалено",
+        "en": "🗑 Task deleted"
+    },
+    "task_done": {
+        "uk": "🎉 Задачу позначено як виконану",
+        "en": "🎉 Task marked as done"
+    },
+    "done_button": {
+        "uk": "✔ Виконано",
+        "en": "✔ Done"
+    },
+    "remind_button": {
+        "uk": "⏰ Нагадати",
+        "en": "⏰ Remind"
+    },
+    "ask_remind_minutes": {
+        "uk": "⏰ Через скільки хвилин нагадати?",
+        "en": "⏰ Remind after how many minutes?"
+    },
+    "remind_set": {
+        "uk": "⏰ Готово! Нагадаю через",
+        "en": "⏰ Done! I will remind in"
+    },
+    "invalid_number": {
+        "uk": "❌ Введи коректне число",
+        "en": "❌ Enter a valid number"
+    },
+    "unknown_action": {
+        "uk": "🤔 Обери дію з меню",
+        "en": "🤔 Choose an action from the menu"
+    },
+    "back": {
+        "uk": "↩ Назад",
+        "en": "↩ Back"
+    },
+    "premium_info": {
+        "uk": (
+            "💎 Premium доступ:\n\n"
+            "✅ Безліміт задач\n"
+            "⏰ Безліміт нагадувань\n"
+            "📂 Розширені фільтри\n"
+            "🚀 Майбутні фічі\n\n"
+            "Напиши:\n👉 ХОЧУ PREMIUM"
+        ),
+        "en": (
+            "💎 Premium access:\n\n"
+            "✅ Unlimited tasks\n"
+            "⏰ Unlimited reminders\n"
+            "📂 Advanced filters\n"
+            "🚀 Future features\n\n"
+            "Type:\n👉 I WANT PREMIUM"
+        )
+    }
+})
 TEXTS["menu_buttons"] = {
     "active": {"uk": "🟡 Активні", "en": "🟡 Active"},
     "done": {"uk": "✅ Виконані", "en": "✅ Done"},
@@ -40,6 +112,18 @@ TEXTS["menu_title"] = {
 TEXTS["no_tasks"] = {
     "uk": "📭 У тебе немає задач",
     "en": "📭 No tasks yet"
+}
+TEXTS["premium_soon"] = {
+    "uk": (
+        "🔥 Чудово!\n\n"
+        "Premium буде доступний найближчим часом.\n"
+        "Я повідомлю тебе першим 👌"
+    ),
+    "en": (
+        "🔥 Awesome!\n\n"
+        "Premium will be available very soon.\n"
+        "I will notify you first 👌"
+    )
 }
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -113,6 +197,8 @@ def get_or_create_user(chat_id):
     return user
 
 def send_language_menu(chat_id):
+    lang = get_lang(chat_id)
+
     keyboard = InlineKeyboardMarkup()
     keyboard.add(
         InlineKeyboardButton("🇺🇦 Українська", callback_data="lang_uk"),
@@ -120,7 +206,7 @@ def send_language_menu(chat_id):
     )
     bot.send_message(
         chat_id,
-        "🌍 Обери мову / Choose language",
+        t(lang, "choose_language"),
         reply_markup=keyboard
     )
 
@@ -162,16 +248,19 @@ def show_tasks_with_numbers(chat_id):
     tasks = get_tasks_db(chat_id)
 
     if not tasks:
-        bot.send_message(chat_id, "📭 У тебе немає задач")
+        lang = get_lang(chat_id)
+        bot.send_message(chat_id, t(lang, "no_tasks"))
         send_menu(chat_id)
         return
 
-    text = "🗑 Введи номер задачі:\n"
+    lang = get_lang(chat_id)
+    text = t(lang, "enter_delete_number") + "\n"
+
     for i, task in enumerate(tasks, start=1):
         text += f"{i}. [{task['category']}] {task['text']}\n"
 
     keyboard = InlineKeyboardMarkup()
-    keyboard.add(back_button())
+    keyboard.add(back_button(chat_id))
 
     bot.send_message(
         chat_id,
@@ -238,9 +327,12 @@ def send_menu(chat_id):
     keyboard.add(
         InlineKeyboardButton(tbtn["language"][lang], callback_data="change_language")
     )
-    bot.send_message(chat_id, t(chat_id, "menu_title"), reply_markup=keyboard)
-def back_button():
-    return InlineKeyboardButton("↩ Назад", callback_data="back")
+    lang = get_lang(chat_id)
+    bot.send_message(chat_id, t(lang, "menu_title"), reply_markup=keyboard)
+
+def back_button(chat_id):
+    lang = get_lang(chat_id)
+    return InlineKeyboardButton(t(lang, "back"), callback_data="back")
 
 user_states = {}  # chat_id: state
 
@@ -252,13 +344,11 @@ def send_category_menu(chat_id):
             InlineKeyboardButton(cat, callback_data=f"cat:{cat}")
         )
 
-    keyboard.add(back_button())  # ← ДОДАЛИ
+    keyboard.add(back_button(chat_id))   # ← ДОДАЛИ
 
-    bot.send_message(
-        chat_id,
-        "📂 Обери категорію:",
-        reply_markup=keyboard
-    )
+    lang = get_lang(chat_id)
+    bot.send_message(chat_id, t(lang, "choose_category"), reply_markup=keyboard)
+
 
 CATEGORIES = {
     "uk": ["Робота", "Дім", "Терміново"],
@@ -295,7 +385,8 @@ def show_filtered_tasks(chat_id, status):
     tasks = get_tasks_by_status(chat_id, status)
 
     if not tasks:
-        bot.send_message(chat_id, "📭 Немає задач")
+        lang = get_lang(chat_id)
+        bot.send_message(chat_id, t(lang, "no_tasks"))
         send_menu(chat_id)
         return
 
@@ -307,26 +398,27 @@ def show_filtered_tasks(chat_id, status):
         text += f"{icon} [{task['category']}] {task['text']}\n"
 
         if task["status"] == "active":
+            lang = get_lang(chat_id)
             keyboard.add(
-                InlineKeyboardButton(
-                    "✔ Виконано",
-                    callback_data=f"done_{task['id']}"
-                ),
-                InlineKeyboardButton(
-                    "⏰ Нагадати",
-                    callback_data=f"remind_{task['id']}"
-                )
-            )
-   
+            InlineKeyboardButton(
+                t(lang, "done_button"),
+                callback_data=f"done_{task['id']}"
+            ),
+            InlineKeyboardButton(
+                t(lang, "remind_button"),
+                callback_data=f"remind_{task['id']}"
+            ))
+            
     bot.send_message(chat_id, text, reply_markup=keyboard)
 
 @bot.callback_query_handler(func=lambda c: c.data == "change_language")
 def change_language(c):
     chat_id = c.message.chat.id
+    lang = get_lang(chat_id)
 
     bot.send_message(
         chat_id,
-        t(chat_id, "choose_language"),
+        t(lang, "choose_language"),
         reply_markup=language_keyboard()
     )
 
@@ -364,11 +456,12 @@ def callback_category(c):
     }
 
     keyboard = InlineKeyboardMarkup()
-    keyboard.add(back_button())
+    keyboard.add(back_button(chat_id))
 
+    lang = get_lang(chat_id)
     bot.send_message(
         chat_id,
-        f"✍️ Напиши задачу для категорії: {category}",
+        f"{t(lang, 'enter_task')} {category}",
         reply_markup=keyboard
     )
 
@@ -413,6 +506,7 @@ def on_delete(call):
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("done_"))
 def mark_done(c):
+    chat_id = c.message.chat.id
     task_id = c.data.split("_")[1]
 
     supabase.table("tasks")\
@@ -421,7 +515,8 @@ def mark_done(c):
         .execute()
 
     bot.answer_callback_query(c.id, "Задача виконана ✅")
-    bot.send_message(c.message.chat.id, "🎉 Задачу позначено як виконану")
+    lang = get_lang(chat_id)
+    bot.send_message(chat_id, t(lang, "no_tasks"))
     callback_list(c)        
 
 @bot.callback_query_handler(func=lambda c: c.data == "filter_active")
@@ -438,19 +533,22 @@ def filter_all(call):
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("remind_"))
 def remind_callback(call):
+    chat_id = call.message.chat.id
     task_id = int(call.data.split("_")[1])
     user_states[call.message.chat.id] = {
         "state": STATE_WAITING_REMIND_TIME,
         "task_id": task_id
     }
     keyboard = InlineKeyboardMarkup()
-    keyboard.add(back_button())
+    keyboard.add(back_button(chat_id))
 
+    lang = get_lang(call.message.chat.id)
     bot.send_message(
         call.message.chat.id,
-        "⏰ Через скільки хвилин нагадати?",
+        t(lang, "ask_remind_minutes"),
         reply_markup=keyboard
     )
+
 
 @bot.callback_query_handler(func=lambda call: call.data == "back")
 def callback_back(call):
@@ -459,35 +557,27 @@ def callback_back(call):
 
 @bot.callback_query_handler(func=lambda c: c.data == "premium")
 def premium_info(c):
-    bot.send_message(
-        c.message.chat.id,
-        "💎 Premium доступ:\n\n"
-        "✅ Безліміт задач\n"
-        "⏰ Безліміт нагадувань\n"
-        "📂 Розширені фільтри\n"
-        "🚀 Майбутні фічі\n\n"
-        "Напиши:\n👉 ХОЧУ PREMIUM"
-    )
+    lang = get_lang(c.message.chat.id)
+    bot.send_message(c.message.chat.id, t(lang, "premium_info"))
+
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
     chat_id = message.chat.id
     text = message.text
     if text.lower() == "хочу premium":
-        bot.send_message(
-            chat_id,
-            "🔥 Чудово!\n\n"
-            "Premium буде доступний найближчим часом.\n"
-            "Я повідомлю тебе першим 👌"
-        )
+        lang = get_lang(chat_id)
+        bot.send_message(chat_id, t(lang, "premium_soon"))
         return
+
     
     state_data = user_states.get(chat_id)
     
     
     if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_REMIND_TIME:
         if not text.isdigit() or int(text) <= 0:
-            bot.send_message(chat_id, "❌ Введи число більше 0")
+            lang = get_lang(chat_id)
+            bot.send_message(chat_id, t(lang, "invalid_number"))
             return
 
         minutes = int(text)
@@ -536,26 +626,30 @@ def handle_text(message):
     if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_DELETE:
         if not text.isdigit():
             user_states.pop(chat_id, None)
-            bot.send_message(chat_id, "❌ Введи номер задачі")
+            lang = get_lang(chat_id)
+            bot.send_message(chat_id, t(lang, "no_tasks"))
             return
 
         index = int(text) - 1
         tasks = get_tasks_db(chat_id)
 
         if index < 0 or index >= len(tasks):
-            bot.send_message(chat_id, "❌ Невірний номер")
+            lang = get_lang(chat_id)
+            bot.send_message(chat_id, t(lang, "no_tasks"))
             return
 
         task_id = tasks[index]["id"]
         delete_task_db(task_id, chat_id)
 
-        bot.send_message(chat_id, "🗑 Задачу видалено")
+        lang = get_lang(chat_id)
+        bot.send_message(chat_id, t(lang, "no_tasks"))
         user_states.pop(chat_id, None)
         send_menu(chat_id)
         return
 
     # ❓ Невідомий текст
-    bot.send_message(chat_id, "🤔 Обери дію з меню")
+    lang = get_lang(chat_id)
+    bot.send_message(chat_id, t(lang, "unknown_action"))
     send_menu(chat_id)
 
 print("🤖 Бот запущено")
