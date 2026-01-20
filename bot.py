@@ -294,13 +294,6 @@ def show_filtered_tasks(chat_id, status):
    
     bot.send_message(chat_id, text, reply_markup=keyboard)
 
-@bot.callback_query_handler(func=lambda c: c.data.startswith("lang_"))
-def set_language(c):
-    lang = c.data.split("_")[1]
-    set_user_language(c.message.chat.id, lang)
-    bot.send_message(c.message.chat.id, t(c.message.chat.id, "start"))
-    send_menu(c.message.chat.id)
-
 @bot.callback_query_handler(func=lambda call: call.data.startswith("lang_"))
 def set_language(call):
     chat_id = call.message.chat.id
@@ -535,6 +528,7 @@ import sys
 sys.stdout.flush()
 threading.Thread(target=reminder_worker, daemon=True).start()
 bot.infinity_polling()
+
 
 
 
