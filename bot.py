@@ -16,8 +16,8 @@ TEXTS = {
         "en": "Choose an action:"
     },
     "choose_language": {
-        "uk": "🌍 Обери мову",
-        "en": "🌍 Choose language"
+        "uk": "🌍",
+        "en": "🌍"
     },
     "language_changed": {
         "uk": "🌍 Мову змінено",
@@ -555,6 +555,7 @@ import sys
 sys.stdout.flush()
 threading.Thread(target=reminder_worker, daemon=True).start()
 bot.infinity_polling()
+
 
 
 
