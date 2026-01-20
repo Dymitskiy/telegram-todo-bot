@@ -78,6 +78,8 @@ def get_tasks_db(chat_id, only_active=True):
     return response.data
 
 def get_or_create_user(chat_id):
+    chat_id = str(chat_id)  # ← КЛЮЧОВО
+
     response = supabase.table("users") \
         .select("*") \
         .eq("chat_id", chat_id) \
@@ -94,6 +96,7 @@ def get_or_create_user(chat_id):
 
     supabase.table("users").insert(user).execute()
     return user
+
 
 def send_language_menu(chat_id):
     keyboard = InlineKeyboardMarkup()
@@ -308,13 +311,14 @@ def change_language(c):
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("lang_"))
 def set_language(c):
-    chat_id = c.message.chat.id
+    chat_id = str(c.message.chat.id)
     lang = c.data.split("_")[1]  # uk або en
 
     # 1️⃣ зберігаємо мову в Supabase
-    supabase.table("users").update({
-        "language": lang
-    }).eq("chat_id", chat_id).execute()
+    supabase.table("users") \
+        .update({"language": lang}) \
+        .eq("chat_id", chat_id) \
+        .execute()
 
     # 2️⃣ ПОВТОРНО читаємо користувача з БД (КЛЮЧОВО!)
     user = get_or_create_user(chat_id)
