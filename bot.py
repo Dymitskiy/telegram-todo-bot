@@ -638,10 +638,23 @@ def premium_callback(c):
     chat_id = c.message.chat.id
     lang = get_lang(chat_id)
 
-    # відповідь користувачу
+    from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(
+        InlineKeyboardButton(
+            "✅ Я оплатив" if lang == "uk" else "✅ I’ve paid",
+            callback_data="paid"
+        )
+    )
+
     bot.send_message(
         chat_id,
-        t(lang, "premium_soon")
+        t(lang, "premium_soon") + "\n\n"
+        + ("Після оплати натисни кнопку нижче 👇"
+           if lang == "uk"
+           else "After the payment, tap the button below 👇"),
+        reply_markup=keyboard
     )
 
     # 🔔 повідомлення адміну
@@ -812,6 +825,25 @@ def grant_premium(message):
     bot.send_message(
         message.chat.id,
         f"✅ Premium видано користувачу {target_chat_id}"
+    )
+
+@bot.callback_query_handler(func=lambda c: c.data == "paid")
+def paid_callback(c):
+    chat_id = c.message.chat.id
+    lang = get_lang(chat_id)
+
+    bot.send_message(
+        chat_id,
+        "🙏 Дякую! Ми перевіримо оплату і активуємо Premium найближчим часом."
+        if lang == "uk"
+        else "🙏 Thank you! We’ll verify the payment and activate Premium shortly."
+    )
+
+    bot.send_message(
+        ADMIN_CHAT_ID,
+        f"💰 Користувач натиснув «Я оплатив»\n\n"
+        f"chat_id: {chat_id}\n"
+        f"дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
     )
 
 @bot.message_handler(commands=["admin_stats"])
