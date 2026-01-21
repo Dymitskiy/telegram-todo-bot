@@ -125,6 +125,50 @@ TEXTS["premium_soon"] = {
         "I will notify you first 👌"
     )
 }
+TEXTS["status_free"] = {
+    "uk": (
+        "📊 Твій статус:\n\n"
+        "План: Free\n"
+        "Задач: {tasks}/{limit}\n"
+        "Повторювані задачі: ❌\n"
+        "Нагадування на дату і час: ❌\n\n"
+        "💎 Premium:\n"
+        "• Безліміт задач\n"
+        "• Повторювані задачі\n"
+        "• Нагадування на дату і час\n\n"
+        "👉 Напиши: ХОЧУ PREMIUM"
+    ),
+    "en": (
+        "📊 Your status:\n\n"
+        "Plan: Free\n"
+        "Tasks: {tasks}/{limit}\n"
+        "Recurring tasks: ❌\n"
+        "Date & time reminders: ❌\n\n"
+        "💎 Premium:\n"
+        "• Unlimited tasks\n"
+        "• Recurring tasks\n"
+        "• Date & time reminders\n\n"
+        "👉 Type: I WANT PREMIUM"
+    )
+}
+TEXTS["status_premium"] = {
+    "uk": (
+        "📊 Твій статус:\n\n"
+        "План: 💎 Premium\n"
+        "Задач: {tasks} / ∞\n"
+        "Повторювані задачі: ✅\n"
+        "Нагадування на дату і час: ✅\n\n"
+        "Дякуємо, що підтримуєш продукт ❤️"
+    ),
+    "en": (
+        "📊 Your status:\n\n"
+        "Plan: 💎 Premium\n"
+        "Tasks: {tasks} / ∞\n"
+        "Recurring tasks: ✅\n"
+        "Date & time reminders: ✅\n\n"
+        "Thank you for supporting the product ❤️"
+    )
+}
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -426,6 +470,26 @@ def start(message):
         )
     else:
         send_menu(chat_id)
+
+@bot.message_handler(commands=["status"])
+def status(message):
+    chat_id = message.chat.id
+    lang = get_lang(chat_id)
+
+    plan = get_user_plan(chat_id)
+    tasks_count = get_tasks_count(chat_id)
+
+    if plan == "premium":
+        text = t(lang, "status_premium").format(
+            tasks=tasks_count
+        )
+    else:
+        text = t(lang, "status_free").format(
+            tasks=tasks_count,
+            limit=FREE_LIMIT
+        )
+
+    bot.send_message(chat_id, text)
 
 def show_filtered_tasks(chat_id, status):
     tasks = get_tasks_by_status(chat_id, status)
