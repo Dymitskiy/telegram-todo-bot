@@ -150,12 +150,16 @@ def language_keyboard():
     )
     return kb
 
-def add_task_db(chat_id, text, category):
+def add_task_db(chat_id, text, category, repeat_type="none"):
+    next_run = calculate_next_run(repeat_type)
+
     supabase.table("tasks").insert({
         "chat_id": str(chat_id),
         "text": text,
         "category": category,
-        "status": "active"
+        "status": "active",
+        "repeat_type": repeat_type,
+        "next_run": next_run.isoformat() if next_run else None
     }).execute()
 
 def delete_task_db(task_id, chat_id):
@@ -294,9 +298,51 @@ def reminder_worker():
         except Exception as e:
             print("REMINDER ERROR:", e)
         time.sleep(30)  # ← ОБОВʼЯЗКОВО ВСЕРЕДИНІ while
- 
+
+def recurring_worker():
+    while True:
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+
+            response = supabase.table("tasks") \
+                .select("*") \
+                .neq("repeat_type", "none") \
+                .lte("next_run", now) \
+                .execute()
+
+            for task in response.data:
+                next_run = calculate_next_run(task["repeat_type"])
+
+                supabase.table("tasks").update({
+                    "next_run": next_run.isoformat() if next_run else None,
+                    "status": "active"
+                }).eq("id", task["id"]).execute()
+
+                bot.send_message(
+                    int(task["chat_id"]),
+                    f"🔁 Повторювана задача:\n[{task['category']}] {task['text']}"
+                )
+
+        except Exception as e:
+            print("RECURRING ERROR:", e)
+
+        time.sleep(60)
+threading.Thread(target=recurring_worker, daemon=True).start()
+
+def calculate_next_run(repeat_type):
+    now = datetime.now(timezone.utc)
+
+    if repeat_type == "daily":
+        return now + timedelta(days=1)
+
+    if repeat_type == "weekly":
+        return now + timedelta(weeks=1)
+
+    return None
+
 STATE_WAITING_DELETE = "waiting_delete"
 STATE_WAITING_REMIND_TIME = "waiting_remind_time"
+STATE_WAITING_REPEAT_TYPE = "waiting_repeat_type"
 
 def set_state(chat_id, state):
     user_states[chat_id] = state
@@ -452,7 +498,8 @@ def callback_category(c):
 
     user_states[chat_id] = {
         "state": "waiting_task_text",
-        "category": category
+        "category": category,
+        "repeat_type": "none"
     }
 
     keyboard = InlineKeyboardMarkup()
@@ -549,7 +596,6 @@ def remind_callback(call):
         reply_markup=keyboard
     )
 
-
 @bot.callback_query_handler(func=lambda call: call.data == "back")
 def callback_back(call):
     user_states.pop(call.message.chat.id, None)
@@ -560,73 +606,125 @@ def premium_info(c):
     lang = get_lang(c.message.chat.id)
     bot.send_message(c.message.chat.id, t(lang, "premium_info"))
 
+@bot.callback_query_handler(func=lambda c: c.data.startswith("repeat:"))
+def choose_repeat(c):
+    chat_id = c.message.chat.id
+    repeat_type = c.data.split(":")[1]
+
+    state_data = user_states.get(chat_id)
+    if not state_data or state_data.get("state") != STATE_WAITING_REPEAT_TYPE:
+        bot.answer_callback_query(c.id)
+        return
+
+    category = state_data["category"]
+    text = state_data["text"]
+
+    plan = get_user_plan(chat_id)
+
+    # 💎 Premium-перевірка
+    if plan == "free" and repeat_type != "none":
+        bot.send_message(
+            chat_id,
+            "🔒 Повторювані задачі доступні лише в Premium 💎\n\n"
+            "✔ Безліміт задач\n"
+            "✔ Повторювані задачі\n"
+            "✔ Безліміт нагадувань\n\n"
+            "👉 Напиши: ХОЧУ PREMIUM"
+        )
+        send_menu(chat_id)
+        user_states.pop(chat_id, None)
+        return
+
+    # 🔒 Free-ліміт задач
+    if plan == "free":
+        count = get_tasks_count(chat_id)
+        if count >= FREE_LIMIT:
+            bot.send_message(
+                chat_id,
+                "🔒 Ліміт безкоштовного плану — 20 задач.\n\n"
+                "💎 Оформи Premium"
+            )
+            send_menu(chat_id)
+            user_states.pop(chat_id, None)
+            return
+
+    # ✅ ВСЕ ДОБРЕ — додаємо задачу
+    add_task_db(chat_id, text, category, repeat_type)
+
+    user_states.pop(chat_id, None)
+
+    bot.send_message(
+        chat_id,
+        f"✅ Задачу додано:\n{text}\n📂 Категорія: {category}"
+    )
+    send_menu(chat_id)
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
     chat_id = message.chat.id
     text = message.text
+    lang = get_lang(chat_id)
+
+    # 💎 Запит Premium
     if text.lower() == "хочу premium":
-        lang = get_lang(chat_id)
         bot.send_message(chat_id, t(lang, "premium_soon"))
         return
 
-    
     state_data = user_states.get(chat_id)
-    
-    
+
+    # ⏰ Очікуємо хвилини для нагадування
     if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_REMIND_TIME:
         if not text.isdigit() or int(text) <= 0:
-            lang = get_lang(chat_id)
             bot.send_message(chat_id, t(lang, "invalid_number"))
             return
 
         minutes = int(text)
         remind_time = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+
         supabase.table("tasks").update({
             "remind_at": remind_time.isoformat()
         }).eq("id", state_data["task_id"]).execute()
 
         user_states.pop(chat_id, None)
+
         bot.send_message(
             chat_id,
             f"⏰ Готово!\nНагадаю через {minutes} хвилин 📅"
         )
         send_menu(chat_id)
         return
-    
-    # ➕ Додавання задачі
+
+    # ➕ Користувач ввів текст задачі
     if isinstance(state_data, dict) and state_data.get("state") == "waiting_task_text":
         category = state_data["category"]
 
-        plan = get_user_plan(chat_id)
+        # Переходимо до вибору повторення
+        user_states[chat_id] = {
+            "state": STATE_WAITING_REPEAT_TYPE,
+            "category": category,
+            "text": text
+        }
 
-        if plan == "free":
-            count = get_tasks_count(chat_id)
-            if count >= FREE_LIMIT:
-                bot.send_message(
-                    chat_id,
-                    "🔒 Ліміт безкоштовного плану (20 задач).\n\n💎 Оформи Premium"
-                )
-                send_menu(chat_id)
-                return
-
-        add_task_db(chat_id, text, category)
-
-
-        user_states.pop(chat_id, None)
+        keyboard = InlineKeyboardMarkup()
+        keyboard.add(
+            InlineKeyboardButton("❌ Без повторення", callback_data="repeat:none")
+        )
+        keyboard.add(
+            InlineKeyboardButton("🔁 Щодня (Premium)", callback_data="repeat:daily"),
+            InlineKeyboardButton("🔁 Щотижня (Premium)", callback_data="repeat:weekly")
+        )
 
         bot.send_message(
             chat_id,
-            f"✅ Задачу додано:\n{text}\n📂 Категорія: {category}"
+            "🔁 Повторювати задачу?",
+            reply_markup=keyboard
         )
-        send_menu(chat_id)
         return
 
     # 🗑 Видалення задачі
     if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_DELETE:
         if not text.isdigit():
             user_states.pop(chat_id, None)
-            lang = get_lang(chat_id)
             bot.send_message(chat_id, t(lang, "no_tasks"))
             return
 
@@ -634,21 +732,18 @@ def handle_text(message):
         tasks = get_tasks_db(chat_id)
 
         if index < 0 or index >= len(tasks):
-            lang = get_lang(chat_id)
             bot.send_message(chat_id, t(lang, "no_tasks"))
             return
 
         task_id = tasks[index]["id"]
         delete_task_db(task_id, chat_id)
 
-        lang = get_lang(chat_id)
-        bot.send_message(chat_id, t(lang, "no_tasks"))
         user_states.pop(chat_id, None)
+        bot.send_message(chat_id, t(lang, "task_deleted"))
         send_menu(chat_id)
         return
 
     # ❓ Невідомий текст
-    lang = get_lang(chat_id)
     bot.send_message(chat_id, t(lang, "unknown_action"))
     send_menu(chat_id)
 
