@@ -686,6 +686,22 @@ def filter_done(call):
 def filter_all(call):
     show_filtered_tasks(call.message.chat.id, None)
 
+@bot.message_handler(commands=["reply"])
+def admin_reply(message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        return
+
+    parts = message.text.split(" ", 2)
+    if len(parts) < 3:
+        bot.send_message(message.chat.id, "Формат: /reply chat_id текст")
+        return
+
+    target_chat_id = int(parts[1])
+    text = parts[2]
+
+    bot.send_message(target_chat_id, text)
+    bot.send_message(message.chat.id, "✅ Повідомлення надіслано")
+
 @bot.callback_query_handler(func=lambda c: c.data.startswith("remind_"))
 def remind_callback(call):
     chat_id = call.message.chat.id
