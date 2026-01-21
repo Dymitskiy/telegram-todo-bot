@@ -473,6 +473,18 @@ def start(message):
     else:
         send_menu(chat_id)
 
+@bot.callback_query_handler(func=lambda c: c.data == "status")
+def status_callback(c):
+    chat_id = c.message.chat.id
+
+    # очищаємо можливий state
+    user_states.pop(chat_id, None)
+
+    bot.send_message(
+        chat_id,
+        build_status_text(chat_id)
+    )
+
 def show_filtered_tasks(chat_id, status):
     tasks = get_tasks_by_status(chat_id, status)
 
