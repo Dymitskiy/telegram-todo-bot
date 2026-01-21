@@ -457,6 +457,13 @@ def show_filtered_tasks(chat_id, status):
             
     bot.send_message(chat_id, text, reply_markup=keyboard)
 
+@bot.message_handler(commands=["myid"])
+def myid(message):
+    bot.send_message(
+        message.chat.id,
+        f"Твій Telegram ID (chat_id): {message.chat.id}"
+    )
+
 @bot.callback_query_handler(func=lambda c: c.data == "change_language")
 def change_language(c):
     chat_id = c.message.chat.id
