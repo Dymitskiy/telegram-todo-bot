@@ -84,7 +84,7 @@ TEXTS.update({
             "⏰ Безліміт нагадувань\n"
             "📂 Розширені фільтри\n"
             "🚀 Майбутні фічі\n\n"
-            "Напиши:\n👉 ХОЧУ PREMIUM"
+            "👉 Натисни кнопку 💎 Premium"
         ),
         "en": (
             "💎 Premium access:\n\n"
@@ -92,7 +92,7 @@ TEXTS.update({
             "⏰ Unlimited reminders\n"
             "📂 Advanced filters\n"
             "🚀 Future features\n\n"
-            "Type:\n👉 I WANT PREMIUM"
+            "👉 Tap the 💎 Premium"
         )
     }
 })
@@ -686,22 +686,6 @@ def filter_done(call):
 def filter_all(call):
     show_filtered_tasks(call.message.chat.id, None)
 
-@bot.message_handler(commands=["reply"])
-def admin_reply(message):
-    if message.chat.id != ADMIN_CHAT_ID:
-        return
-
-    parts = message.text.split(" ", 2)
-    if len(parts) < 3:
-        bot.send_message(message.chat.id, "Формат: /reply chat_id текст")
-        return
-
-    target_chat_id = int(parts[1])
-    text = parts[2]
-
-    bot.send_message(target_chat_id, text)
-    bot.send_message(message.chat.id, "✅ Повідомлення надіслано")
-
 @bot.callback_query_handler(func=lambda c: c.data.startswith("remind_"))
 def remind_callback(call):
     chat_id = call.message.chat.id
@@ -778,6 +762,28 @@ def choose_repeat(c):
         f"✅ Задачу додано:\n{text}\n📂 Категорія: {category}"
     )
     send_menu(chat_id)
+
+@bot.message_handler(commands=["reply"])
+def admin_reply(message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        return  # захист
+
+    parts = message.text.split(" ", 2)
+    if len(parts) < 3:
+        bot.send_message(
+            message.chat.id,
+            "❌ Формат:\n/reply chat_id текст повідомлення"
+        )
+        return
+
+    target_chat_id = int(parts[1])
+    text = parts[2]
+
+    bot.send_message(target_chat_id, text)
+    bot.send_message(
+        message.chat.id,
+        f"✅ Повідомлення надіслано користувачу {target_chat_id}"
+    )
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
