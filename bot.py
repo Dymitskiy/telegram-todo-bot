@@ -169,7 +169,7 @@ TEXTS["status_premium"] = {
         "Thank you for supporting the product ❤️"
     )
 }
-TEXTS["menu_buttons"]["status"] = {"uk": "📊", "en": "📊"}
+TEXTS["menu_buttons"]["status"] = {"uk": "статус", "en": "status"}
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -472,25 +472,6 @@ def start(message):
         )
     else:
         send_menu(chat_id)
-
-
-    chat_id = message.chat.id
-    lang = get_lang(chat_id)
-
-    plan = get_user_plan(chat_id)
-    tasks_count = get_tasks_count(chat_id)
-
-    if plan == "premium":
-        text = t(lang, "status_premium").format(
-            tasks=tasks_count
-        )
-    else:
-        text = t(lang, "status_free").format(
-            tasks=tasks_count,
-            limit=FREE_LIMIT
-        )
-
-    bot.send_message(chat_id, text)
 
 def show_filtered_tasks(chat_id, status):
     tasks = get_tasks_by_status(chat_id, status)
