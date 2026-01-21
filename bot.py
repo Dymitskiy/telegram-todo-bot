@@ -116,13 +116,12 @@ TEXTS["no_tasks"] = {
 TEXTS["premium_soon"] = {
     "uk": (
         "🔥 Чудово!\n\n"
-        "Premium буде доступний найближчим часом.\n"
-        "Я повідомлю тебе першим 👌"
+        "Найближчим часом з Вами звʼяжеться адміністратор "
+        "для активації Premium-статусу 💎"
     ),
     "en": (
-        "🔥 Awesome!\n\n"
-        "Premium will be available very soon.\n"
-        "I will notify you first 👌"
+        "🔥 Great!\n\n"
+        "An admin will contact you shortly to activate your Premium status 💎"
     )
 }
 TEXTS["status_free"] = {
