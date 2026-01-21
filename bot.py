@@ -5,7 +5,7 @@ from supabase import create_client
 from datetime import datetime, timedelta, timezone
 import time
 import threading
-
+ADMIN_CHAT_ID = 566508867
 TEXTS = {
     "welcome": {
         "uk": "Я телеграм бот 🤖 DYMYTSKIY ✅",
@@ -786,9 +786,20 @@ def handle_text(message):
         return
 
     # 💎 Запит Premium
-    if text.lower() == "хочу premium":
+    if text.lower() in ["хочу premium", "хочу прем", "premium"]:
+        # повідомлення користувачу
         bot.send_message(chat_id, t(lang, "premium_soon"))
+
+        # 🔔 повідомлення адміну
+        bot.send_message(
+            ADMIN_CHAT_ID,
+            f"💎 Запит на Premium\n\n"
+            f"chat_id: {chat_id}\n"
+            f"мова: {lang}\n"
+            f"дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+        )
         return
+
 
     # ➕ Користувач вводить текст задачі
     if isinstance(state_data, dict) and state_data.get("state") == "waiting_task_text":
@@ -847,7 +858,3 @@ import sys
 sys.stdout.flush()
 threading.Thread(target=reminder_worker, daemon=True).start()
 bot.infinity_polling()
-
-
-
-
