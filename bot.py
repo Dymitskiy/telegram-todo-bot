@@ -169,6 +169,7 @@ TEXTS["status_premium"] = {
         "Thank you for supporting the product ❤️"
     )
 }
+TEXTS["menu_buttons"]["status"] = {"uk": "📊", "en": "📊"}
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -415,8 +416,10 @@ def send_menu(chat_id):
     )
 
     keyboard.add(
+        InlineKeyboardButton(tbtn["status"][lang], callback_data="status"),
         InlineKeyboardButton(tbtn["language"][lang], callback_data="change_language")
     )
+
     lang = get_lang(chat_id)
     bot.send_message(chat_id, t(lang, "menu_title"), reply_markup=keyboard)
 
@@ -438,7 +441,6 @@ def send_category_menu(chat_id):
 
     lang = get_lang(chat_id)
     bot.send_message(chat_id, t(lang, "choose_category"), reply_markup=keyboard)
-
 
 CATEGORIES = {
     "uk": ["Робота", "Дім", "Терміново"],
@@ -471,8 +473,7 @@ def start(message):
     else:
         send_menu(chat_id)
 
-@bot.message_handler(commands=["status"])
-def status(message):
+
     chat_id = message.chat.id
     lang = get_lang(chat_id)
 
@@ -621,6 +622,19 @@ def callback_list(call):
 def on_delete(call):
     set_state(call.message.chat.id, STATE_WAITING_DELETE)
     show_tasks_with_numbers(call.message.chat.id)
+
+def build_status_text(chat_id):
+    lang = get_lang(chat_id)
+    plan = get_user_plan(chat_id)
+    tasks_count = get_tasks_count(chat_id)
+
+    if plan == "premium":
+        return t(lang, "status_premium").format(tasks=tasks_count)
+    else:
+        return t(lang, "status_free").format(
+            tasks=tasks_count,
+            limit=FREE_LIMIT
+        )
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("done_"))
 def mark_done(c):
