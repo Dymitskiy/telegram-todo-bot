@@ -784,6 +784,70 @@ def admin_reply(message):
         f"✅ Повідомлення надіслано користувачу {target_chat_id}"
     )
 
+@bot.message_handler(commands=["grant_premium"])
+def grant_premium(message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        return
+
+    parts = message.text.split()
+    if len(parts) != 2:
+        bot.send_message(message.chat.id, "Формат: /grant_premium chat_id")
+        return
+
+    target_chat_id = parts[1]
+
+    supabase.table("users").update({
+        "plan": "premium",
+        "premium_activated_at": datetime.utcnow().isoformat()
+    }).eq("chat_id", target_chat_id).execute()
+
+
+    bot.send_message(
+        target_chat_id,
+        "🎉 Premium активовано!\n\nДякуємо за підтримку 💎"
+    )
+
+    send_menu(target_chat_id)
+
+    bot.send_message(
+        message.chat.id,
+        f"✅ Premium видано користувачу {target_chat_id}"
+    )
+
+@bot.message_handler(commands=["admin_stats"])
+def admin_stats(message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        return
+
+    users = supabase.table("users").select(
+        "plan, premium_activated_at"
+    ).execute().data
+
+    total = len(users)
+    premium = sum(1 for u in users if u["plan"] == "premium")
+    free = total - premium
+
+    last_premium = None
+    premium_dates = [
+        u["premium_activated_at"]
+        for u in users
+        if u["premium_activated_at"]
+    ]
+    if premium_dates:
+        last_premium = max(premium_dates)
+
+    text = (
+        "📊 Статистика бота\n\n"
+        f"👥 Всього користувачів: {total}\n"
+        f"💎 Premium: {premium}\n"
+        f"🆓 Free: {free}\n"
+    )
+
+    if last_premium:
+        text += f"\n📅 Остання активація:\n{last_premium}"
+
+    bot.send_message(message.chat.id, text)
+
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
     chat_id = message.chat.id
