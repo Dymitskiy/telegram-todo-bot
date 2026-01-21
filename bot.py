@@ -5,7 +5,7 @@ from supabase import create_client
 from datetime import datetime, timedelta, timezone
 import time
 import threading
-ADMIN_CHAT_ID = 566508867
+ADMIN_CHAT_ID = 566508867  # ← твій chat_id
 TEXTS = {
     "welcome": {
         "uk": "Я телеграм бот 🤖 DYMYTSKIY ✅",
@@ -169,7 +169,7 @@ TEXTS["status_premium"] = {
         "Thank you for supporting the product ❤️"
     )
 }
-TEXTS["menu_buttons"]["status"] = {"uk": "статус", "en": "status"}
+TEXTS["menu_buttons"]["status"] = {"uk": "📊 Статус", "en": "📊 Status"}
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -344,6 +344,49 @@ def reminder_worker():
             print("REMINDER ERROR:", e)
         time.sleep(30)  # ← ОБОВʼЯЗКОВО ВСЕРЕДИНІ while
 
+def build_status_text(chat_id):
+    lang = get_lang(chat_id)
+    plan = get_user_plan(chat_id)
+    tasks_count = get_tasks_count(chat_id)
+
+    if plan == "premium":
+        return t(lang, "status_premium").format(tasks=tasks_count)
+    else:
+        return t(lang, "status_free").format(
+            tasks=tasks_count,
+            limit=FREE_LIMIT
+        )
+
+def show_filtered_tasks(chat_id, status):
+    tasks = get_tasks_by_status(chat_id, status)
+
+    if not tasks:
+        lang = get_lang(chat_id)
+        bot.send_message(chat_id, t(lang, "no_tasks"))
+        send_menu(chat_id)
+        return
+
+    text = ""
+    keyboard = InlineKeyboardMarkup()
+
+    for task in tasks:
+        icon = "✅" if task["status"] == "done" else "🟡"
+        text += f"{icon} [{task['category']}] {task['text']}\n"
+
+        if task["status"] == "active":
+            lang = get_lang(chat_id)
+            keyboard.add(
+            InlineKeyboardButton(
+                t(lang, "done_button"),
+                callback_data=f"done_{task['id']}"
+            ),
+            InlineKeyboardButton(
+                t(lang, "remind_button"),
+                callback_data=f"remind_{task['id']}"
+            ))
+            
+    bot.send_message(chat_id, text, reply_markup=keyboard)
+
 def recurring_worker():
     while True:
         try:
@@ -495,36 +538,6 @@ def status_callback(c):
         build_status_text(chat_id)
     )
 
-def show_filtered_tasks(chat_id, status):
-    tasks = get_tasks_by_status(chat_id, status)
-
-    if not tasks:
-        lang = get_lang(chat_id)
-        bot.send_message(chat_id, t(lang, "no_tasks"))
-        send_menu(chat_id)
-        return
-
-    text = ""
-    keyboard = InlineKeyboardMarkup()
-
-    for task in tasks:
-        icon = "✅" if task["status"] == "done" else "🟡"
-        text += f"{icon} [{task['category']}] {task['text']}\n"
-
-        if task["status"] == "active":
-            lang = get_lang(chat_id)
-            keyboard.add(
-            InlineKeyboardButton(
-                t(lang, "done_button"),
-                callback_data=f"done_{task['id']}"
-            ),
-            InlineKeyboardButton(
-                t(lang, "remind_button"),
-                callback_data=f"remind_{task['id']}"
-            ))
-            
-    bot.send_message(chat_id, text, reply_markup=keyboard)
-
 @bot.message_handler(commands=["myid"])
 def myid(message):
     bot.send_message(
@@ -621,23 +634,30 @@ def callback_list(call):
 
     bot.send_message(chat_id, text, reply_markup=keyboard)
 
+@bot.callback_query_handler(func=lambda c: c.data == "premium")
+def premium_callback(c):
+    chat_id = c.message.chat.id
+    lang = get_lang(chat_id)
+
+    # відповідь користувачу
+    bot.send_message(
+        chat_id,
+        t(lang, "premium_soon")
+    )
+
+    # 🔔 повідомлення адміну
+    bot.send_message(
+        ADMIN_CHAT_ID,
+        f"💎 Запит на Premium\n\n"
+        f"chat_id: {chat_id}\n"
+        f"мова: {lang}\n"
+        f"дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+    )
+
 @bot.callback_query_handler(func=lambda call: call.data == "delete")
 def on_delete(call):
     set_state(call.message.chat.id, STATE_WAITING_DELETE)
     show_tasks_with_numbers(call.message.chat.id)
-
-def build_status_text(chat_id):
-    lang = get_lang(chat_id)
-    plan = get_user_plan(chat_id)
-    tasks_count = get_tasks_count(chat_id)
-
-    if plan == "premium":
-        return t(lang, "status_premium").format(tasks=tasks_count)
-    else:
-        return t(lang, "status_free").format(
-            tasks=tasks_count,
-            limit=FREE_LIMIT
-        )
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("done_"))
 def mark_done(c):
@@ -689,11 +709,6 @@ def remind_callback(call):
 def callback_back(call):
     user_states.pop(call.message.chat.id, None)
     send_menu(call.message.chat.id)
-
-@bot.callback_query_handler(func=lambda c: c.data == "premium")
-def premium_info(c):
-    lang = get_lang(c.message.chat.id)
-    bot.send_message(c.message.chat.id, t(lang, "premium_info"))
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("repeat:"))
 def choose_repeat(c):
@@ -783,21 +798,6 @@ def handle_text(message):
                 "25.09.2026 19:00"
             )
 
-        return
-
-    # 💎 Запит Premium
-    if text.lower() in ["хочу premium", "хочу прем", "premium"]:
-        # повідомлення користувачу
-        bot.send_message(chat_id, t(lang, "premium_soon"))
-
-        # 🔔 повідомлення адміну
-        bot.send_message(
-            ADMIN_CHAT_ID,
-            f"💎 Запит на Premium\n\n"
-            f"chat_id: {chat_id}\n"
-            f"мова: {lang}\n"
-            f"дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
-        )
         return
 
 
