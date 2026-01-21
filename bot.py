@@ -341,8 +341,8 @@ def calculate_next_run(repeat_type):
     return None
 
 STATE_WAITING_DELETE = "waiting_delete"
-STATE_WAITING_REMIND_TIME = "waiting_remind_time"
 STATE_WAITING_REPEAT_TYPE = "waiting_repeat_type"
+STATE_WAITING_REMIND_DATETIME = "waiting_remind_datetime"
 
 def set_state(chat_id, state):
     user_states[chat_id] = state
@@ -589,18 +589,19 @@ def filter_all(call):
 def remind_callback(call):
     chat_id = call.message.chat.id
     task_id = int(call.data.split("_")[1])
-    user_states[call.message.chat.id] = {
-        "state": STATE_WAITING_REMIND_TIME,
+
+    user_states[chat_id] = {
+        "state": STATE_WAITING_REMIND_DATETIME,
         "task_id": task_id
     }
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(back_button(chat_id))
 
-    lang = get_lang(call.message.chat.id)
     bot.send_message(
-        call.message.chat.id,
-        t(lang, "ask_remind_minutes"),
-        reply_markup=keyboard
+        chat_id,
+        "🗓 Введи дату і час нагадування\n\n"
+        "Формат:\n"
+        "DD.MM.YYYY HH:MM\n\n"
+        "Приклад:\n"
+        "25.09.2026 19:00"
     )
 
 @bot.callback_query_handler(func=lambda call: call.data == "back")
@@ -672,40 +673,46 @@ def handle_text(message):
     text = message.text
     lang = get_lang(chat_id)
 
+    state_data = user_states.get(chat_id)
+
+    # ⏰ ВВЕДЕННЯ ДАТИ + ЧАСУ НАГАДУВАННЯ (ПЕРШЕ!)
+    if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_REMIND_DATETIME:
+        try:
+            remind_dt = datetime.strptime(text, "%d.%m.%Y %H:%M")
+            remind_dt = remind_dt.replace(tzinfo=timezone.utc)
+
+            supabase.table("tasks").update({
+                "remind_at": remind_dt.isoformat()
+            }).eq("id", state_data["task_id"]).execute()
+
+            user_states.pop(chat_id, None)
+
+            bot.send_message(
+                chat_id,
+                f"⏰ Нагадування встановлено:\n"
+                f"{remind_dt.strftime('%d.%m.%Y %H:%M')}"
+            )
+            send_menu(chat_id)
+
+        except ValueError:
+            bot.send_message(
+                chat_id,
+                "❌ Невірний формат.\n"
+                "Спробуй так:\n"
+                "25.09.2026 19:00"
+            )
+
+        return
+
     # 💎 Запит Premium
     if text.lower() == "хочу premium":
         bot.send_message(chat_id, t(lang, "premium_soon"))
         return
 
-    state_data = user_states.get(chat_id)
-
-    # ⏰ Очікуємо хвилини для нагадування
-    if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_REMIND_TIME:
-        if not text.isdigit() or int(text) <= 0:
-            bot.send_message(chat_id, t(lang, "invalid_number"))
-            return
-
-        minutes = int(text)
-        remind_time = datetime.now(timezone.utc) + timedelta(minutes=minutes)
-
-        supabase.table("tasks").update({
-            "remind_at": remind_time.isoformat()
-        }).eq("id", state_data["task_id"]).execute()
-
-        user_states.pop(chat_id, None)
-
-        bot.send_message(
-            chat_id,
-            f"⏰ Готово!\nНагадаю через {minutes} хвилин 📅"
-        )
-        send_menu(chat_id)
-        return
-
-    # ➕ Користувач ввів текст задачі
+    # ➕ Користувач вводить текст задачі
     if isinstance(state_data, dict) and state_data.get("state") == "waiting_task_text":
         category = state_data["category"]
 
-        # Переходимо до вибору повторення
         user_states[chat_id] = {
             "state": STATE_WAITING_REPEAT_TYPE,
             "category": category,
