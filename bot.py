@@ -411,15 +411,25 @@ def send_menu(chat_id):
         InlineKeyboardButton(tbtn["delete"][lang], callback_data="delete"),
     )
 
-    keyboard.add(
-        InlineKeyboardButton(tbtn["premium"][lang], callback_data="premium")
-    )
+    plan = get_user_plan(chat_id)
 
-    keyboard.add(
-        InlineKeyboardButton(tbtn["status"][lang], callback_data="status"),
-        InlineKeyboardButton(tbtn["language"][lang], callback_data="change_language")
-    )
+    # 💎 Premium button — ТІЛЬКИ якщо НЕ premium
+    if plan != "premium":
+        keyboard.add(
+            InlineKeyboardButton(tbtn["premium"][lang], callback_data="premium")
+        )
 
+    # 📊 Status button — ТІЛЬКИ якщо НЕ premiums
+    if plan != "premium":
+        keyboard.add(
+            InlineKeyboardButton(tbtn["status"][lang], callback_data="status"),
+            InlineKeyboardButton(tbtn["language"][lang], callback_data="change_language")
+        )
+    else:
+        # для premium залишаємо тільки мову
+        keyboard.add(
+            InlineKeyboardButton(tbtn["language"][lang], callback_data="change_language")
+        )
     lang = get_lang(chat_id)
     bot.send_message(chat_id, t(lang, "menu_title"), reply_markup=keyboard)
 
