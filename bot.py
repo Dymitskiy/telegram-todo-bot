@@ -432,7 +432,8 @@ STATE_WAITING_REPEAT_TYPE = "waiting_repeat_type"
 STATE_WAITING_REMIND_DATETIME = "waiting_remind_datetime"
 
 def set_state(chat_id, state):
-    user_states[chat_id] = state
+    user_states[chat_id] = {"state": state}
+
 def send_menu(chat_id):
     lang = get_lang(chat_id)
     tbtn = TEXTS["menu_buttons"]
