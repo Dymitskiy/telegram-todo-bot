@@ -8,8 +8,8 @@ import threading
 ADMIN_CHAT_ID = 566508867  # ← твій chat_id
 TEXTS = {
     "welcome": {
-        "uk": "Я телеграм бот 🤖 DYMYTSKIY ✅",
-        "en": "I am a Telegram bot 🤖 DYMYTSKIY ✅"
+        "uk": "Я телеграм бот 🤖 DYMITSKIY ✅",
+        "en": "I am a Telegram bot 🤖 DYMITSKIY ✅"
     },
     "menu": {
         "uk": "Обери дію:",
@@ -135,7 +135,6 @@ TEXTS["status_free"] = {
         "• Безліміт задач\n"
         "• Повторювані задачі\n"
         "• Нагадування на дату і час\n\n"
-        "👉 Напиши: ХОЧУ PREMIUM"
     ),
     "en": (
         "📊 Your status:\n\n"
@@ -147,7 +146,6 @@ TEXTS["status_free"] = {
         "• Unlimited tasks\n"
         "• Recurring tasks\n"
         "• Date & time reminders\n\n"
-        "👉 Type: I WANT PREMIUM"
     )
 }
 TEXTS["status_premium"] = {
@@ -746,7 +744,6 @@ def choose_repeat(c):
             "✔ Безліміт задач\n"
             "✔ Повторювані задачі\n"
             "✔ Безліміт нагадувань\n\n"
-            "👉 Напиши: ХОЧУ PREMIUM"
         )
         send_menu(chat_id)
         user_states.pop(chat_id, None)
