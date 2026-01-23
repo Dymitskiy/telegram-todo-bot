@@ -3,6 +3,7 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from supabase import create_client
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import time
 import threading
 ADMIN_CHAT_ID = 566508867  # ← твій chat_id
@@ -320,11 +321,11 @@ def get_lang(chat_id):
 def reminder_worker():
     while True:
         try:
-            now = datetime.now(timezone.utc) .isoformat()
+            now = datetime.now(timezone.utc)
             response = supabase.table("tasks") \
                 .select("*") \
                 .not_.is_("remind_at", None) \
-                .lte("remind_at", now) \
+                .lte("remind_at", now.isoformat()) \
                 .execute()
 
 
@@ -332,6 +333,12 @@ def reminder_worker():
                 bot.send_message(
                     int(task["chat_id"]),
                     f"⏰ Нагадування:\n[{task['category']}] {task['text']}"
+                )
+
+                print(
+                    f"[REMINDER] chat_id={task['chat_id']} "
+                    f"task_id={task['id']} "
+                    f"time={task['remind_at']}"
                 )
 
                 supabase.table("tasks").update({
@@ -889,20 +896,30 @@ def handle_text(message):
     # ⏰ ВВЕДЕННЯ ДАТИ + ЧАСУ НАГАДУВАННЯ (ПЕРШЕ!)
     if isinstance(state_data, dict) and state_data.get("state") == STATE_WAITING_REMIND_DATETIME:
         try:
-            remind_dt = datetime.strptime(text, "%d.%m.%Y %H:%M")
-            remind_dt = remind_dt.replace(tzinfo=timezone.utc)
+            # 1️⃣ отримуємо timezone користувача
+            user = get_or_create_user(chat_id)
+            user_tz = ZoneInfo(user.get("timezone", "Europe/Kyiv"))
 
+            # 2️⃣ парсимо введений час як ЛОКАЛЬНИЙ
+            local_dt = datetime.strptime(text, "%d.%m.%Y %H:%M")
+            local_dt = local_dt.replace(tzinfo=user_tz)
+
+            # 3️⃣ конвертуємо в UTC
+            utc_dt = local_dt.astimezone(timezone.utc)
+
+            # 4️⃣ зберігаємо В UTC
             supabase.table("tasks").update({
-                "remind_at": remind_dt.isoformat()
+                "remind_at": utc_dt.isoformat()
             }).eq("id", state_data["task_id"]).execute()
-
+        
             user_states.pop(chat_id, None)
 
             bot.send_message(
                 chat_id,
                 f"⏰ Нагадування встановлено:\n"
-                f"{remind_dt.strftime('%d.%m.%Y %H:%M')}"
+                f"{local_dt.strftime('%d.%m.%Y %H:%M')}"
             )
+
             send_menu(chat_id)
 
         except ValueError:
@@ -971,5 +988,4 @@ def handle_text(message):
 print("🤖 Бот запущено")
 import sys
 sys.stdout.flush()
-threading.Thread(target=reminder_worker, daemon=True).start()
 bot.infinity_polling()
