@@ -419,7 +419,9 @@ def recurring_worker():
             print("RECURRING ERROR:", e)
 
         time.sleep(60)
+
 threading.Thread(target=recurring_worker, daemon=True).start()
+threading.Thread(target=reminder_worker, daemon=True).start()
 
 def calculate_next_run(repeat_type):
     now = datetime.now(timezone.utc)
