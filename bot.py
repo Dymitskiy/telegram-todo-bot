@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import time
 import threading
-import random
 ADMIN_CHAT_ID = 566508867  # ← твій chat_id
 TEXTS = {
     "welcome": {
@@ -169,22 +168,6 @@ TEXTS["status_premium"] = {
     )
 }
 TEXTS["menu_buttons"]["status"] = {"uk": "📊 Статус", "en": "📊 Status"}
-TEXTS["partner_phrases"] = {
-    "uk": [
-        "Задача додана. Ще задачі будуть?",
-        "Готово 👍 Хочеш додати ще?",
-        "Записав. Продовжуємо чи на цьому все?",
-        "Окей, зберіг. Є ще щось у голові?",
-        "Є. Якщо згадаєш ще — я тут."
-    ],
-    "en": [
-        "Task added. Any more tasks?",
-        "Done 👍 Want to add another one?",
-        "Saved. Continue or stop here?",
-        "Okay, stored. Anything else on your mind?",
-        "Got it. If you think of more — I’m here."
-    ]
-}
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -790,14 +773,14 @@ def choose_repeat(c):
 
     # ✅ ВСЕ ДОБРЕ — додаємо задачу
     add_task_db(chat_id, text, category, repeat_type)
+
     user_states.pop(chat_id, None)
 
-    lang = get_lang(chat_id)
-    phrases = TEXTS["partner_phrases"][lang]
-    message = random.choice(phrases)
-
-    bot.send_message(chat_id, message)
-
+    bot.send_message(
+        chat_id,
+        f"✅ Задачу додано:\n{text}\n📂 Категорія: {category}"
+    )
+    send_menu(chat_id)
 
 @bot.message_handler(commands=["reply"])
 def admin_reply(message):
